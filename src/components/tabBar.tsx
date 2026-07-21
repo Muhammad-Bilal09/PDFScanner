@@ -1,20 +1,13 @@
-import { useRouter } from 'expo-router';
-import { useRef } from 'react';
-import {
-  Animated,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from "expo-router";
+import { useRef } from "react";
+import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { useTheme } from '@/hooks/use-theme';
-import { Icon } from '@/components/shared/Icon';
-import { Spacing, Radius, Shadows } from '@/theme';
+import { Icon } from "@/components/shared/Icon";
+import { useTheme } from "@/hooks/use-theme";
+import { Radius, Shadows, Spacing } from "@/theme";
 
-export type ActiveTab = 'library' | 'ocr' | 'scan' | 'cloud' | 'settings';
+export type ActiveTab = "home" | "files" | "tools" | "settings" | "scan";
 
 interface TabBarProps {
   activeTab: ActiveTab;
@@ -69,14 +62,19 @@ function TabItem({
           styles.label,
           {
             color: active ? theme.primary : theme.textSecondary,
-            fontWeight: active ? '800' : '600',
+            fontWeight: active ? "800" : "600",
           },
         ]}
         numberOfLines={1}
       >
         {label}
       </Text>
-      <View style={[styles.dot, { backgroundColor: theme.primary, opacity: active ? 1 : 0 }]} />
+      <View
+        style={[
+          styles.dot,
+          { backgroundColor: theme.primary, opacity: active ? 1 : 0 },
+        ]}
+      />
     </Pressable>
   );
 }
@@ -96,79 +94,94 @@ export function TabBar({ activeTab }: TabBarProps) {
     }).start();
 
   return (
-    <View style={[styles.outerShell, { backgroundColor: theme.background, paddingBottom: Math.max(insets.bottom, 12) }]}>
-      <View style={[styles.pill, { backgroundColor: theme.surface, borderColor: theme.border }, Shadows.md]}>
-        
-        {/* Left Side Tabs */}
-        <TabItem
-          label="Library"
-          sf="folder.fill"
-          active={activeTab === 'library'}
-          onPress={() => router.replace('/home' as any)}
-        />
+    <View style={styles.container}>
+      {/* Floating Camera Scanner Action Button in Bottom-Right */}
+      <Animated.View
+        style={[styles.floatingFabSlot, { transform: [{ scale: fabScale }] }]}
+      >
+        <Pressable
+          onPress={() => router.push("/scan" as any)}
+          onPressIn={() => animateFab(0.92)}
+          onPressOut={() => animateFab(1)}
+          style={[
+            styles.floatingFab,
+            { backgroundColor: theme.primary },
+            Shadows.lg,
+          ]}
+          hitSlop={8}
+        >
+          <Icon sf="camera.fill" fallback="📷" size={24} color="#FFFFFF" />
+        </Pressable>
+      </Animated.View>
 
-        <TabItem
-          label="OCR"
-          sf="text.viewfinder"
-          active={activeTab === 'ocr'}
-          onPress={() => router.replace('/ocrRecognition' as any)}
-        />
+      {/* 4-Tab Bottom Bar Pill */}
+      <View
+        style={[
+          styles.outerShell,
+          { paddingBottom: Math.max(insets.bottom, 12) },
+        ]}
+      >
+        <View
+          style={[
+            styles.pill,
+            { backgroundColor: theme.surface, borderColor: theme.border },
+            Shadows.md,
+          ]}
+        >
+          <TabItem
+            label="Home"
+            sf="house.fill"
+            active={activeTab === "home"}
+            onPress={() => router.replace("/home" as any)}
+          />
 
-        {/* Center elevated FAB */}
-        <View style={styles.fabSlot}>
-          <Animated.View style={{ transform: [{ scale: fabScale }] }}>
-            <Pressable
-              onPress={() => router.replace('/scan' as any)}
-              onPressIn={() => animateFab(0.92)}
-              onPressOut={() => animateFab(1)}
-              hitSlop={8}
-            >
-              <View style={[styles.fabRing, { backgroundColor: theme.background }]}>
-                <View style={[styles.fab, { backgroundColor: theme.primary }, Shadows.lg]}>
-                  <View style={styles.fabHighlight} pointerEvents="none" />
-                  <Icon sf="camera.fill" fallback="" size={24} color="#FFFFFF" />
-                </View>
-              </View>
-            </Pressable>
-          </Animated.View>
+          <TabItem
+            label="Files"
+            sf="doc.text.fill"
+            active={activeTab === "files"}
+            onPress={() => router.replace("/files" as any)}
+          />
+
+          <TabItem
+            label="Tools"
+            sf="grid"
+            active={activeTab === "tools"}
+            onPress={() => router.replace("/tools" as any)}
+          />
+
+          <TabItem
+            label="Settings"
+            sf="gearshape.fill"
+            active={activeTab === "settings"}
+            onPress={() => router.replace("/settings" as any)}
+          />
         </View>
-
-        {/* Right Side Tabs */}
-        <TabItem
-          label="Cloud"
-          sf="cloud.fill"
-          active={activeTab === 'cloud'}
-          onPress={() => router.replace('/settings' as any)}
-        />
-
-        <TabItem
-          label="Settings"
-          sf="slider.horizontal.3"
-          active={activeTab === 'settings'}
-          onPress={() => router.replace('/settings' as any)}
-        />
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    position: "relative",
+    width: "100%",
+  },
   outerShell: {
     paddingTop: 4,
     paddingHorizontal: Spacing.md,
   },
   pill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: Radius.full,
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: Radius.lg,
     paddingHorizontal: Spacing.sm,
     paddingVertical: 8,
     borderWidth: 1,
   },
   tabItem: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     gap: 3,
     paddingVertical: 2,
   },
@@ -176,9 +189,9 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: Radius.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'transparent',
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "transparent",
   },
   label: {
     fontSize: 9.5,
@@ -190,36 +203,19 @@ const styles = StyleSheet.create({
     borderRadius: Radius.full,
     marginTop: 1,
   },
-  // Elevated Circular FAB in Center
-  fabSlot: {
-    width: 68,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'visible',
-    marginTop: -32,
+  // Floating Scan FAB
+  floatingFabSlot: {
+    position: "absolute",
+    right: 30,
+    // left: 30,
+    bottom: 120,
+    zIndex: 9999,
   },
-  fabRing: {
-    width: 66,
-    height: 66,
-    borderRadius: Radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fab: {
-    width: 54,
-    height: 54,
-    borderRadius: Radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  fabHighlight: {
-    position: 'absolute',
-    top: -15,
-    left: -15,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+  floatingFab: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

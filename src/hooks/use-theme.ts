@@ -1,10 +1,10 @@
 import { Colors } from '@/theme/colors';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useThemeContext } from '@/context/theme-context';
 
 export function useTheme() {
-  const scheme = useColorScheme();
-  const theme = scheme === 'dark' ? 'dark' : 'light';
-
-  return Colors[theme];
+  const context = useThemeContext();
+  if (context && context.theme) {
+    return context.theme;
+  }
+  return Colors.light;
 }
-

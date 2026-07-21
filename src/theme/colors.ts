@@ -1,44 +1,65 @@
 export const Colors = {
   light: {
-    primary: '#005E54',
-    primaryLight: '#E6F4F1',
-    primaryDark: '#00473F',
-    background: '#F8F9FA',
+    primary: '#DC2626',
+    primaryLight: '#FEF2F2',
+    primaryDark: '#991B1B',
+    background: '#FAFAFA',
     surface: '#FFFFFF',
-    text: '#1A1C1B',
-    textSecondary: '#5C6360',
-    border: '#E0E5E2',
-    error: '#D32F2F',
-    errorLight: '#FFEBEE',
-    success: '#388E3C',
-    successLight: '#E8F5E9',
-    warning: '#F57C00',
-    warningLight: '#FFF3E0',
+    text: '#171717',
+    textSecondary: '#737373',
+    border: '#E5E5E5',
+    error: '#DC2626',
+    errorLight: '#FEF2F2',
+    success: '#2563EB',
+    successLight: '#EFF6FF',
+    warning: '#F97316',
+    warningLight: '#FFF7ED',
     orange: '#FF6535',
-    inactive: '#C2C9C7',
-    iconDefault: '#1A1C1B',
+    inactive: '#D4D4D4',
+    iconDefault: '#171717',
     shadow: '#000000',
   },
   dark: {
-    primary: '#00BFA5',
-    primaryLight: '#004D40',
-    primaryDark: '#00E676',
-    background: '#121212',
-    surface: '#1E1E1E',
-    text: '#E0E0E0',
-    textSecondary: '#A0A0A0',
-    border: '#2C2C2C',
-    error: '#CF6679',
-    errorLight: '#402B2E',
-    success: '#81C784',
-    successLight: '#1C3224',
-    warning: '#FFB74D',
+    primary: '#EF4444',
+    primaryLight: '#450A0A',
+    primaryDark: '#FCA5A5',
+    background: '#0F0F10',
+    surface: '#1C1C1E',
+    text: '#F4F4F5',
+    textSecondary: '#A1A1AA',
+    border: '#2D2D30',
+    error: '#EF4444',
+    errorLight: '#450A0A',
+    success: '#3B82F6',
+    successLight: '#1E3A8A',
+    warning: '#FBA74D',
     warningLight: '#3E2723',
     orange: '#FF8A65',
-    inactive: '#505050',
-    iconDefault: '#E0E0E0',
+    inactive: '#52525B',
+    iconDefault: '#F4F4F5',
     shadow: '#000000',
   },
 } as const;
 
-export type ThemeType = typeof Colors.light;
+export type ThemePalette = {
+  primary: string;
+  primaryLight: string;
+  primaryDark: string;
+  background: string;
+  surface: string;
+  text: string;
+  textSecondary: string;
+  border: string;
+  error: string;
+  errorLight: string;
+  success: string;
+  successLight: string;
+  warning: string;
+  warningLight: string;
+  orange: string;
+  inactive: string;
+  iconDefault: string;
+  shadow: string;
+};
+
+export type ThemeType = ThemePalette;

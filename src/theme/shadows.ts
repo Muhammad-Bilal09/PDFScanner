@@ -39,7 +39,7 @@ export const Shadows = {
   }),
   fab: Platform.select({
     ios: {
-      shadowColor: '#005E54',
+      shadowColor: '#000000',
       shadowOffset: { width: 0, height: 6 },
       shadowOpacity: 0.3,
       shadowRadius: 10,

@@ -18,13 +18,22 @@ export function GlobalProcessor() {
   }, []);
 
   useEffect(() => {
-    // Check and pre-download the libraries for offline usage
-    downloadOfflineLibraries();
+    let mounted = true;
+    (async () => {
+      try {
+        await downloadOfflineLibraries();
+      } catch (e) {
+        console.warn('[GlobalProcessor] Offline download check skipped:', e);
+      }
+      const content = await getProcessorHtml();
+      if (mounted) {
+        setHtml(content);
+      }
+    })();
 
-    // Load HTML string
-    getProcessorHtml().then((content) => {
-      setHtml(content);
-    });
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   if (!html) return null;

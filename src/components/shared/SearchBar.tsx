@@ -28,7 +28,7 @@ export function SearchBar({
       style={[
         styles.container,
         {
-          backgroundColor: theme.background === '#121212' ? '#242424' : '#EBEFEF',
+          backgroundColor: (theme.background as string) === '#0F0F10' ? '#242424' : '#EBEFEF',
           borderColor: theme.border,
         },
       ]}

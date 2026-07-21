@@ -1,21 +1,15 @@
-import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import {
-  Dimensions,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useOnboarding } from '@/hooks/use-onboarding';
-import { useTheme } from '@/hooks/use-theme';
-import { Spacing, Radius, Typography, Shadows } from '@/theme';
-import { Icon } from '@/components/shared/Icon';
-import { LoadingView } from '@/components/shared/LoadingView';
+import { Icon } from "@/components/shared/Icon";
+import { LoadingView } from "@/components/shared/LoadingView";
+import { useOnboarding } from "@/hooks/use-onboarding";
+import { useTheme } from "@/hooks/use-theme";
+import { Radius, Shadows, Spacing, Typography } from "@/theme";
+import { Image } from "expo-image";
+import { useRouter } from "expo-router";
+import { useEffect, useState } from "react";
+import { Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-const { width: SCREEN_W } = Dimensions.get('window');
+const { width: SCREEN_W } = Dimensions.get("window");
 
 export default function OnboardingScreen() {
   const router = useRouter();
@@ -25,7 +19,7 @@ export default function OnboardingScreen() {
 
   useEffect(() => {
     if (!loading && hasSeenOnboarding === true) {
-      router.replace('/home' as any);
+      router.replace("/home" as any);
     }
   }, [hasSeenOnboarding, loading]);
 
@@ -38,23 +32,25 @@ export default function OnboardingScreen() {
       setActiveSlide((s) => s + 1);
     } else {
       await completeOnboarding();
-      router.replace('/home' as any);
+      router.replace("/home" as any);
     }
   };
 
   const handleSkip = async () => {
     await completeOnboarding();
-    router.replace('/home' as any);
+    router.replace("/home" as any);
   };
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
-      <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
         {/* Header - Skip Button */}
         <View style={styles.header}>
           {activeSlide < 2 ? (
             <Pressable onPress={handleSkip} hitSlop={12} style={styles.skipBtn}>
-              <Text style={[styles.skipText, { color: theme.primary }]}>Skip</Text>
+              <Text style={[styles.skipText, { color: theme.primary }]}>
+                Skip
+              </Text>
             </Pressable>
           ) : (
             <View style={styles.skipPlaceholder} />
@@ -66,13 +62,18 @@ export default function OnboardingScreen() {
           {activeSlide === 0 && (
             <View style={styles.slide}>
               <Image
-                source={require('@/assets/images/onboarding_quality.png')}
+                source={require("@/assets/images/onboarding_quality.png")}
                 style={styles.slideImage}
                 contentFit="contain"
               />
-              <Text style={[styles.title, { color: theme.text }]}>Superior Quality</Text>
-              <Text style={[styles.description, { color: theme.textSecondary }]}>
-                Highest resolution scans for professional results. Perfect for receipts, contracts, and certificates.
+              <Text style={[styles.title, { color: theme.text }]}>
+                Superior Quality
+              </Text>
+              <Text
+                style={[styles.description, { color: theme.textSecondary }]}
+              >
+                Highest resolution scans for professional results. Perfect for
+                receipts, contracts, and certificates.
               </Text>
             </View>
           )}
@@ -80,13 +81,19 @@ export default function OnboardingScreen() {
           {activeSlide === 1 && (
             <View style={styles.slide}>
               <Image
-                source={require('@/assets/images/onboarding_ocr.png')}
+                source={require("@/assets/images/onboarding_ocr.png")}
                 style={styles.slideImage}
                 contentFit="contain"
               />
-              <Text style={[styles.title, { color: theme.text }]}>Smart OCR</Text>
-              <Text style={[styles.description, { color: theme.textSecondary }]}>
-                Extract and edit text from any image with our AI-powered OCR. Search within your PDF contents instantly.
+              <Text style={[styles.title, { color: theme.text }]}>
+                Smart Scan
+              </Text>
+              <Text
+                style={[styles.description, { color: theme.textSecondary }]}
+              >
+                \ Capture, enhance, and organize your documents with fast,
+                offline-ready scanning. Search within your PDF contents
+                instantly.
               </Text>
             </View>
           )}
@@ -94,19 +101,42 @@ export default function OnboardingScreen() {
           {activeSlide === 2 && (
             <View style={styles.slide}>
               <Image
-                source={require('@/assets/images/onboarding_sync.png')}
+                source={require("@/assets/images/onboarding_sync.png")}
                 style={styles.slideImage}
                 contentFit="contain"
               />
               <View style={styles.badgeRow}>
-                <View style={[styles.syncBadge, { backgroundColor: theme.primaryLight, borderColor: theme.border }]}>
-                  <Icon sf="arrow.triangle.2.circlepath" fallback="🔄" size={13} color={theme.primary} />
-                  <Text style={[styles.syncBadgeText, { color: theme.primary }]}>REAL-TIME SYNC</Text>
+                <View
+                  style={[
+                    styles.syncBadge,
+                    {
+                      backgroundColor: theme.primaryLight,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                >
+                  <Icon
+                    sf="lock.shield"
+                    fallback="🛡️"
+                    size={13}
+                    color={theme.primary}
+                  />
+                  <Text
+                    style={[styles.syncBadgeText, { color: theme.primary }]}
+                  >
+                    SECURE STORAGE
+                  </Text>
                 </View>
               </View>
-              <Text style={[styles.title, { color: theme.text }]}>Organize & Sync</Text>
-              <Text style={[styles.description, { color: theme.textSecondary }]}>
-                Access your files anywhere with seamless cloud synchronization. Whether on your phone or tablet, your documents are secure.
+              <Text style={[styles.title, { color: theme.text }]}>
+                100% Offline-First
+              </Text>
+              <Text
+                style={[styles.description, { color: theme.textSecondary }]}
+              >
+                Your documents are saved 100% securely offline on your device.
+                Absolutely no cloud storage required, keeping your scans
+                private.
               </Text>
             </View>
           )}
@@ -125,7 +155,9 @@ export default function OnboardingScreen() {
                     style={[
                       styles.dot,
                       {
-                        backgroundColor: isActive ? theme.primary : theme.inactive,
+                        backgroundColor: isActive
+                          ? theme.primary
+                          : theme.inactive,
                         width: isActive ? 24 : 6,
                       },
                     ]}
@@ -134,30 +166,63 @@ export default function OnboardingScreen() {
               })}
             </View>
             {activeSlide === 2 && (
-              <Text style={[styles.indicatorText, { color: theme.textSecondary }]}>3 / 3</Text>
+              <Text
+                style={[styles.indicatorText, { color: theme.textSecondary }]}
+              >
+                3 / 3
+              </Text>
             )}
           </View>
 
           {/* Action Button */}
           <Pressable
-            style={[styles.actionBtn, { backgroundColor: theme.primary }, Shadows.md]}
+            style={[
+              styles.actionBtn,
+              { backgroundColor: theme.primary },
+              Shadows.md,
+            ]}
             onPress={handleNext}
           >
             <Text style={styles.actionBtnText}>
-              {activeSlide === 2 ? 'Get Started' : 'Next'}
+              {activeSlide === 2 ? "Get Started" : "Next"}
             </Text>
             <Icon sf="arrow.right" fallback="→" size={16} color="#FFFFFF" />
           </Pressable>
 
           {/* Bottom Card for slide 3 */}
           {activeSlide === 2 ? (
-            <View style={[styles.bottomInfoCard, { backgroundColor: theme.surface, borderColor: theme.border }, Shadows.sm]}>
-              <View style={[styles.deviceIconBox, { backgroundColor: theme.primaryLight }]}>
-                <Icon sf="laptopcomputer.and.iphone" fallback="💻" size={20} color={theme.primary} />
+            <View
+              style={[
+                styles.bottomInfoCard,
+                { backgroundColor: theme.surface, borderColor: theme.border },
+                Shadows.sm,
+              ]}
+            >
+              <View
+                style={[
+                  styles.deviceIconBox,
+                  { backgroundColor: theme.primaryLight },
+                ]}
+              >
+                <Icon
+                  sf="lock.fill"
+                  fallback="🔒"
+                  size={20}
+                  color={theme.primary}
+                />
               </View>
               <View style={styles.bottomInfoTextWrap}>
-                <Text style={[styles.bottomInfoTitle, { color: theme.text }]}>Multi-device</Text>
-                <Text style={[styles.bottomInfoSubtitle, { color: theme.textSecondary }]}>Syncs instantly across all OS</Text>
+                <Text style={[styles.bottomInfoTitle, { color: theme.text }]}>
+                  Private & Secure
+                </Text>
+                <Text
+                  style={[
+                    styles.bottomInfoSubtitle,
+                    { color: theme.textSecondary },
+                  ]}
+                >
+                  No tracking, zero cloud data transfer
+                </Text>
               </View>
             </View>
           ) : (
@@ -175,13 +240,13 @@ const styles = StyleSheet.create({
   },
   safe: {
     flex: 1,
-    justifyContent: 'space-between',
+    justifyContent: "space-between",
   },
   header: {
     height: 48,
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
     paddingHorizontal: Spacing.lg,
   },
   skipBtn: {
@@ -197,14 +262,14 @@ const styles = StyleSheet.create({
   },
   carouselContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: Spacing.xl,
   },
   slide: {
-    width: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "center",
     gap: Spacing.md,
   },
   slideImage: {
@@ -216,8 +281,8 @@ const styles = StyleSheet.create({
     marginBottom: -Spacing.xs,
   },
   syncBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: Spacing.xs,
     borderRadius: Radius.full,
     paddingHorizontal: Spacing.sm,
@@ -232,11 +297,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: Typography.sizes.xxl,
     fontWeight: Typography.weights.heavy as any,
-    textAlign: 'center',
+    textAlign: "center",
   },
   description: {
     fontSize: Typography.sizes.sm,
-    textAlign: 'center',
+    textAlign: "center",
     lineHeight: 22,
     paddingHorizontal: Spacing.sm,
   },
@@ -244,19 +309,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xl,
     paddingBottom: Spacing.md,
     gap: Spacing.md,
-    alignItems: 'center',
+    alignItems: "center",
   },
   indicatorContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: Spacing.sm,
     height: 20,
   },
   indicatorRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: Spacing.xs,
-    alignItems: 'center',
+    alignItems: "center",
   },
   dot: {
     height: 6,
@@ -268,16 +333,16 @@ const styles = StyleSheet.create({
     marginLeft: Spacing.xs,
   },
   actionBtn: {
-    width: '100%',
+    width: "100%",
     borderRadius: Radius.md,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
     paddingVertical: Spacing.md,
     gap: Spacing.xs,
   },
   actionBtnText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: Typography.sizes.md,
     fontWeight: Typography.weights.bold as any,
   },
@@ -285,9 +350,9 @@ const styles = StyleSheet.create({
     height: 72,
   },
   bottomInfoCard: {
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
     borderRadius: Radius.md,
     padding: Spacing.sm,
     borderWidth: 1,
@@ -296,8 +361,8 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: Radius.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginRight: Spacing.sm,
   },
   bottomInfoTextWrap: {

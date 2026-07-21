@@ -1,45 +1,48 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useState, useEffect, useRef } from 'react';
+import { Image } from "expo-image";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useRef, useState } from "react";
 import {
-  Alert,
-  Dimensions,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  ActivityIndicator,
-  Modal,
-  TextInput,
-  Image as RNImage,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Image } from 'expo-image';
+    ActivityIndicator,
+    Alert,
+    Dimensions,
+    Modal,
+    Pressable,
+    Image as RNImage,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import { useDocuments } from '@/hooks/use-documents';
-import { useTheme } from '@/hooks/use-theme';
-import { Spacing, Radius, Typography, Shadows } from '@/theme';
-import { Header } from '@/components/shared/Header';
-import { Icon } from '@/components/shared/Icon';
-import { PrimaryButton } from '@/components/shared/PrimaryButton';
-import { OutlineButton } from '@/components/shared/OutlineButton';
-import { DocumentItemType, PageItemType } from '@/components/shared/DocumentCard';
-import { DocumentCropView } from '@/components/shared/DocumentCropView';
-import { ImageProcessor, Point } from '@/services/processor';
+import {
+    DocumentItemType,
+    PageItemType,
+} from "@/components/shared/DocumentCard";
+import { DocumentCropView } from "@/components/shared/DocumentCropView";
+import { Header } from "@/components/shared/Header";
+import { Icon } from "@/components/shared/Icon";
+import { OutlineButton } from "@/components/shared/OutlineButton";
+import { PrimaryButton } from "@/components/shared/PrimaryButton";
+import { useDocuments } from "@/hooks/use-documents";
+import { useTheme } from "@/hooks/use-theme";
+import { ImageProcessor, Point } from "@/services/processor";
+import { Radius, Shadows, Spacing, Typography } from "@/theme";
 
-const { width: SCREEN_W } = Dimensions.get('window');
+const { width: SCREEN_W } = Dimensions.get("window");
 const GRID_ITEM_W = (SCREEN_W - 56) / 2;
 
 const FILTER_OPTIONS = [
-  { id: 'original', label: 'Original', color: '#FDFBF7' },
-  { id: 'auto', label: 'Auto', color: '#E0F7FA' },
-  { id: 'document', label: 'Document', color: '#E0F2F1' },
-  { id: 'magic', label: 'Magic Color', color: '#EBEFF5' },
-  { id: 'color', label: 'Color', color: '#FFF8E1' },
-  { id: 'bw', label: 'Clean B&W', color: '#FFFFFF' },
-  { id: 'gray', label: 'Grayscale', color: '#EEEEEE' },
-  { id: 'high_contrast', label: 'Contrast', color: '#E0E0E0' },
-  { id: 'receipt', label: 'Receipt', color: '#F5F5F5' },
+  { id: "original", label: "Original", color: "#FDFBF7" },
+  { id: "auto", label: "Auto", color: "#E0F7FA" },
+  { id: "document", label: "Document", color: "#E0F2F1" },
+  { id: "magic", label: "Magic Color", color: "#EBEFF5" },
+  { id: "color", label: "Color", color: "#FFF8E1" },
+  { id: "bw", label: "Clean B&W", color: "#FFFFFF" },
+  { id: "gray", label: "Grayscale", color: "#EEEEEE" },
+  { id: "high_contrast", label: "Contrast", color: "#E0E0E0" },
+  { id: "receipt", label: "Receipt", color: "#F5F5F5" },
 ];
 
 interface SliderProps {
@@ -51,10 +54,17 @@ interface SliderProps {
   onComplete: (val: number) => void;
 }
 
-function CustomSlider({ label, value, min, max, onChange, onComplete }: SliderProps) {
+function CustomSlider({
+  label,
+  value,
+  min,
+  max,
+  onChange,
+  onComplete,
+}: SliderProps) {
   const theme = useTheme();
   const trackRef = useRef<View>(null);
-  
+
   const handleTouch = (evt: any) => {
     const pageX = evt.nativeEvent.pageX;
     trackRef.current?.measure((x, y, width, height, px, py) => {
@@ -87,7 +97,7 @@ function CustomSlider({ label, value, min, max, onChange, onComplete }: SliderPr
           {value > 0 ? `+${value}` : value}
         </Text>
       </View>
-      <View 
+      <View
         ref={trackRef}
         style={styles.sliderTrackWrapper}
         onStartShouldSetResponder={() => true}
@@ -96,9 +106,19 @@ function CustomSlider({ label, value, min, max, onChange, onComplete }: SliderPr
         onResponderRelease={handleRelease}
       >
         <View style={styles.sliderTrackBg}>
-          <View style={[styles.sliderTrackFill, { width: filledPercent, backgroundColor: theme.primary }]} />
+          <View
+            style={[
+              styles.sliderTrackFill,
+              { width: filledPercent, backgroundColor: theme.primary },
+            ]}
+          />
         </View>
-        <View style={[styles.sliderThumb, { left: filledPercent, borderColor: theme.primary }]} />
+        <View
+          style={[
+            styles.sliderThumb,
+            { left: filledPercent, borderColor: theme.primary },
+          ]}
+        />
       </View>
     </View>
   );
@@ -132,22 +152,46 @@ function PageGridItem({
   const theme = useTheme();
 
   return (
-    <View style={[styles.gridItem, { backgroundColor: theme.surface, borderColor: theme.border }, Shadows.sm]}>
+    <View
+      style={[
+        styles.gridItem,
+        { backgroundColor: theme.surface, borderColor: theme.border },
+        Shadows.sm,
+      ]}
+    >
       {/* Page Header */}
       <View style={styles.gridItemHeader}>
-        <Text style={[styles.pageNumText, { color: theme.text }]}>Page {pageNum}</Text>
+        <Text style={[styles.pageNumText, { color: theme.text }]}>
+          Page {pageNum}
+        </Text>
         <View style={styles.headerActions}>
-          <Pressable onPress={onDuplicate} hitSlop={6} accessibilityLabel="Duplicate page">
-            <Icon sf="doc.on.doc" fallback="⎘" size={14} color={theme.textSecondary} />
+          <Pressable
+            onPress={onDuplicate}
+            hitSlop={6}
+            accessibilityLabel="Duplicate page"
+          >
+            <Icon
+              sf="doc.on.doc"
+              fallback="⎘"
+              size={14}
+              color={theme.textSecondary}
+            />
           </Pressable>
-          <Pressable onPress={onDelete} hitSlop={6} accessibilityLabel="Delete page">
+          <Pressable
+            onPress={onDelete}
+            hitSlop={6}
+            accessibilityLabel="Delete page"
+          >
             <Icon sf="trash" fallback="🗑" size={14} color={theme.error} />
           </Pressable>
         </View>
       </View>
 
       {/* Image Preview */}
-      <Pressable onPress={onPress} style={[styles.gridItemBody, { borderColor: theme.border }]}>
+      <Pressable
+        onPress={onPress}
+        style={[styles.gridItemBody, { borderColor: theme.border }]}
+      >
         <Image
           source={{ uri: page.processedUri }}
           style={[
@@ -164,9 +208,20 @@ function PageGridItem({
 
       {/* Page Actions Footer (Rotate and Rearrange) */}
       <View style={styles.gridItemFooter}>
-        <Pressable onPress={onRotate} hitSlop={8} style={styles.footerActionBtn}>
-          <Icon sf="arrow.clockwise" fallback="↻" size={12} color={theme.primary} />
-          <Text style={[styles.footerActionBtnText, { color: theme.primary }]}>Rotate</Text>
+        <Pressable
+          onPress={onRotate}
+          hitSlop={8}
+          style={styles.footerActionBtn}
+        >
+          <Icon
+            sf="arrow.clockwise"
+            fallback="↻"
+            size={12}
+            color={theme.primary}
+          />
+          <Text style={[styles.footerActionBtnText, { color: theme.primary }]}>
+            Rotate
+          </Text>
         </Pressable>
 
         <View style={styles.rearrangeControls}>
@@ -176,7 +231,12 @@ function PageGridItem({
             hitSlop={6}
             style={[styles.arrowBtn, isFirst && styles.disabledArrow]}
           >
-            <Icon sf="chevron.left" fallback="◀" size={12} color={isFirst ? theme.inactive : theme.text} />
+            <Icon
+              sf="chevron.left"
+              fallback="◀"
+              size={12}
+              color={isFirst ? theme.inactive : theme.text}
+            />
           </Pressable>
           <Pressable
             onPress={onPressMoveDown}
@@ -184,7 +244,12 @@ function PageGridItem({
             hitSlop={6}
             style={[styles.arrowBtn, isLast && styles.disabledArrow]}
           >
-            <Icon sf="chevron.right" fallback="▶" size={12} color={isLast ? theme.inactive : theme.text} />
+            <Icon
+              sf="chevron.right"
+              fallback="▶"
+              size={12}
+              color={isLast ? theme.inactive : theme.text}
+            />
           </Pressable>
         </View>
       </View>
@@ -199,20 +264,22 @@ export default function DocumentEditScreen() {
   const { documents, updateDocument, renameDocument } = useDocuments();
 
   const [document, setDocument] = useState<DocumentItemType | null>(null);
-  
+
   // Re-edit states
-  const [editorState, setEditorState] = useState<'grid' | 'cropping' | 'review'>('grid');
+  const [editorState, setEditorState] = useState<
+    "grid" | "cropping" | "review"
+  >("grid");
   const [activePage, setActivePage] = useState<PageItemType | null>(null);
   const [imageWidth, setImageWidth] = useState(800);
   const [imageHeight, setImageHeight] = useState(1000);
   const [cropPoints, setCropPoints] = useState<Point[]>([]);
-  
+
   // Review modifications
-  const [activeFilter, setActiveFilter] = useState('magic');
+  const [activeFilter, setActiveFilter] = useState("magic");
   const [activeRotation, setActiveRotation] = useState(0);
   const [warpedPreviewUri, setWarpedPreviewUri] = useState<string | null>(null);
   const [baseWarpedUri, setBaseWarpedUri] = useState<string | null>(null);
-  
+
   // Manual adjustments state
   const [brightness, setBrightness] = useState(0);
   const [contrast, setContrast] = useState(0);
@@ -220,11 +287,11 @@ export default function DocumentEditScreen() {
   const [sharpness, setSharpness] = useState(0);
 
   // Review sub-tab: 'filter' | 'adjust'
-  const [reviewTab, setReviewTab] = useState<'filter' | 'adjust'>('filter');
+  const [reviewTab, setReviewTab] = useState<"filter" | "adjust">("filter");
 
   // Renaming state
   const [showRenameModal, setShowRenameModal] = useState(false);
-  const [renameText, setRenameText] = useState('');
+  const [renameText, setRenameText] = useState("");
 
   const [processing, setProcessing] = useState(false);
 
@@ -242,17 +309,22 @@ export default function DocumentEditScreen() {
   const handleDeletePage = (pageId: string) => {
     if (!document) return;
     if (document.pagesList.length <= 1) {
-      Alert.alert('Cannot Delete', 'A scanned document must contain at least one page.');
+      Alert.alert(
+        "Cannot Delete",
+        "A scanned document must contain at least one page.",
+      );
       return;
     }
 
-    Alert.alert('Delete Page', 'Are you sure you want to remove this page?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert("Delete Page", "Are you sure you want to remove this page?", [
+      { text: "Cancel", style: "cancel" },
       {
-        text: 'Delete',
-        style: 'destructive',
+        text: "Delete",
+        style: "destructive",
         onPress: async () => {
-          const updatedPages = document.pagesList.filter((p) => p.id !== pageId);
+          const updatedPages = document.pagesList.filter(
+            (p) => p.id !== pageId,
+          );
           await updateDocument(document.id, {
             pages: updatedPages.length,
             pagesList: updatedPages,
@@ -266,7 +338,7 @@ export default function DocumentEditScreen() {
   const handleRotatePage = async (pageId: string) => {
     if (!document) return;
     const updatedPages = document.pagesList.map((p) =>
-      p.id === pageId ? { ...p, rotation: (p.rotation + 90) % 360 } : p
+      p.id === pageId ? { ...p, rotation: (p.rotation + 90) % 360 } : p,
     );
     await updateDocument(document.id, { pagesList: updatedPages });
   };
@@ -278,7 +350,7 @@ export default function DocumentEditScreen() {
       ...page,
       id: Math.random().toString(36).substring(2, 9),
     };
-    
+
     const idx = document.pagesList.findIndex((p) => p.id === page.id);
     const updatedPages = [...document.pagesList];
     updatedPages.splice(idx + 1, 0, duplicatedPage);
@@ -319,20 +391,20 @@ export default function DocumentEditScreen() {
     setContrast(0);
     setSaturation(0);
     setSharpness(0);
-    setReviewTab('filter');
-    
+    setReviewTab("filter");
+
     RNImage.getSize(
       page.originalUri,
       (w: number, h: number) => {
         setImageWidth(w);
         setImageHeight(h);
-        setEditorState('cropping');
+        setEditorState("cropping");
       },
       () => {
         setImageWidth(800);
         setImageHeight(1000);
-        setEditorState('cropping');
-      }
+        setEditorState("cropping");
+      },
     );
   };
 
@@ -346,13 +418,13 @@ export default function DocumentEditScreen() {
       const warpedPath = await ImageProcessor.warpAndEnhance(
         activePage.originalUri,
         adjustedCorners,
-        activeFilter
+        activeFilter,
       );
       setWarpedPreviewUri(warpedPath);
       setBaseWarpedUri(warpedPath);
-      setEditorState('review');
+      setEditorState("review");
     } catch (e: any) {
-      Alert.alert('Processing Error', e.message || 'Warp perspective failed.');
+      Alert.alert("Processing Error", e.message || "Warp perspective failed.");
     } finally {
       setProcessing(false);
     }
@@ -368,7 +440,7 @@ export default function DocumentEditScreen() {
       const warpedPath = await ImageProcessor.warpAndEnhance(
         activePage.originalUri,
         cropPoints,
-        filterId
+        filterId,
       );
       setWarpedPreviewUri(warpedPath);
       setBaseWarpedUri(warpedPath);
@@ -377,14 +449,19 @@ export default function DocumentEditScreen() {
       setSaturation(0);
       setSharpness(0);
     } catch (e) {
-      Alert.alert('Filter Error', 'Failed to update page enhancements.');
+      Alert.alert("Filter Error", "Failed to update page enhancements.");
     } finally {
       setProcessing(false);
     }
   };
 
   // Apply sliders modifications (brightness, contrast, saturation, sharpness)
-  const applyImageAdjustments = async (b: number, c: number, s: number, sh: number) => {
+  const applyImageAdjustments = async (
+    b: number,
+    c: number,
+    s: number,
+    sh: number,
+  ) => {
     if (!baseWarpedUri) return;
     setProcessing(true);
 
@@ -397,7 +474,7 @@ export default function DocumentEditScreen() {
       });
       setWarpedPreviewUri(adjustedPath);
     } catch (e) {
-      console.warn('[Editor] Saturation/Brightness adjustments failed:', e);
+      console.warn("[Editor] Saturation/Brightness adjustments failed:", e);
     } finally {
       setProcessing(false);
     }
@@ -418,16 +495,16 @@ export default function DocumentEditScreen() {
               filter: activeFilter,
               rotation: activeRotation,
             }
-          : p
+          : p,
       );
 
       await updateDocument(document.id, { pagesList: updatedPages });
-      setEditorState('grid');
+      setEditorState("grid");
       setActivePage(null);
       setWarpedPreviewUri(null);
       setBaseWarpedUri(null);
     } catch (e) {
-      Alert.alert('Error', 'Failed to save updates to page.');
+      Alert.alert("Error", "Failed to save updates to page.");
     } finally {
       setProcessing(false);
     }
@@ -439,7 +516,7 @@ export default function DocumentEditScreen() {
       await renameDocument(document.id, renameText.trim());
       setShowRenameModal(false);
     } catch (e) {
-      Alert.alert('Error', 'Failed to rename document.');
+      Alert.alert("Error", "Failed to rename document.");
     }
   };
 
@@ -447,33 +524,43 @@ export default function DocumentEditScreen() {
   const handleAddPages = () => {
     if (!document) return;
     router.replace({
-      pathname: '/scan' as any,
+      pathname: "/scan" as any,
       params: { appendDocId: document.id },
     });
   };
 
-  if (editorState === 'cropping' && activePage) {
+  if (editorState === "cropping" && activePage) {
     return (
       <DocumentCropView
         imageUri={activePage.originalUri}
         imageWidth={imageWidth}
         imageHeight={imageHeight}
         initialPoints={cropPoints}
-        onCancel={() => setEditorState('grid')}
+        onCancel={() => setEditorState("grid")}
         onSave={handleReeditCropSave}
       />
     );
   }
 
-  if (editorState === 'review' && activePage && warpedPreviewUri) {
+  if (editorState === "review" && activePage && warpedPreviewUri) {
     return (
-      <View style={[styles.root, { backgroundColor: '#121212' }]}>
-        <SafeAreaView style={styles.reeditContainer} edges={['top', 'bottom']}>
+      <View style={[styles.root, { backgroundColor: "#121212" }]}>
+        <SafeAreaView style={styles.reeditContainer} edges={["top", "bottom"]}>
           {/* Header */}
           <View style={styles.reeditHeader}>
-            <Pressable style={styles.headerBtn} onPress={() => setEditorState('cropping')}>
-              <Icon sf="chevron.left" fallback="←" size={16} color={theme.primary} />
-              <Text style={{ color: theme.primary, fontWeight: '700' }}>Back to Crop</Text>
+            <Pressable
+              style={styles.headerBtn}
+              onPress={() => setEditorState("cropping")}
+            >
+              <Icon
+                sf="chevron.left"
+                fallback="←"
+                size={16}
+                color={theme.primary}
+              />
+              <Text style={{ color: theme.primary, fontWeight: "700" }}>
+                Back to Crop
+              </Text>
             </Pressable>
             <Text style={styles.reeditTitle}>Adjust Page</Text>
             <View style={{ width: 80 }} />
@@ -507,24 +594,56 @@ export default function DocumentEditScreen() {
           {/* Segmented controls for Filters vs Adjustments */}
           <View style={styles.reviewTabContainer}>
             <Pressable
-              style={[styles.reviewTabBtn, reviewTab === 'filter' && styles.reviewTabActive]}
-              onPress={() => setReviewTab('filter')}
+              style={[
+                styles.reviewTabBtn,
+                reviewTab === "filter" && [
+                  styles.reviewTabActive,
+                  { backgroundColor: theme.primary },
+                ],
+              ]}
+              onPress={() => setReviewTab("filter")}
             >
-              <Text style={[styles.reviewTabText, reviewTab === 'filter' && styles.reviewTabActiveText]}>Filters</Text>
+              <Text
+                style={[
+                  styles.reviewTabText,
+                  reviewTab === "filter" && styles.reviewTabActiveText,
+                ]}
+              >
+                Filters
+              </Text>
             </Pressable>
             <Pressable
-              style={[styles.reviewTabBtn, reviewTab === 'adjust' && styles.reviewTabActive]}
-              onPress={() => setReviewTab('adjust')}
+              style={[
+                styles.reviewTabBtn,
+                reviewTab === "adjust" && [
+                  styles.reviewTabActive,
+                  { backgroundColor: theme.primary },
+                ],
+              ]}
+              onPress={() => setReviewTab("adjust")}
             >
-              <Text style={[styles.reviewTabText, reviewTab === 'adjust' && styles.reviewTabActiveText]}>Adjust</Text>
+              <Text
+                style={[
+                  styles.reviewTabText,
+                  reviewTab === "adjust" && styles.reviewTabActiveText,
+                ]}
+              >
+                Adjust
+              </Text>
             </Pressable>
           </View>
 
           {/* Sub-panel filter list */}
-          {reviewTab === 'filter' ? (
+          {reviewTab === "filter" ? (
             <View style={styles.filterSection}>
-              <Text style={styles.filterSectionTitle}>SELECT ENHANCEMENT FILTER</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+              <Text style={styles.filterSectionTitle}>
+                SELECT ENHANCEMENT FILTER
+              </Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.filterScroll}
+              >
                 {FILTER_OPTIONS.map((opt) => {
                   const isSelected = opt.id === activeFilter;
                   return (
@@ -532,12 +651,25 @@ export default function DocumentEditScreen() {
                       key={opt.id}
                       style={[
                         styles.filterCard,
-                        isSelected && { borderColor: theme.primary, backgroundColor: 'rgba(0,191,165,0.08)' },
+                        isSelected && {
+                          borderColor: theme.primary,
+                          backgroundColor: "rgba(0,191,165,0.08)",
+                        },
                       ]}
                       onPress={() => handleReeditFilterChange(opt.id)}
                     >
-                      <View style={[styles.filterPreview, { backgroundColor: opt.color }]} />
-                      <Text style={[styles.filterCardText, isSelected && { color: theme.primary }]}>
+                      <View
+                        style={[
+                          styles.filterPreview,
+                          { backgroundColor: opt.color },
+                        ]}
+                      />
+                      <Text
+                        style={[
+                          styles.filterCardText,
+                          isSelected && { color: theme.primary },
+                        ]}
+                      >
                         {opt.label}
                       </Text>
                     </Pressable>
@@ -599,7 +731,7 @@ export default function DocumentEditScreen() {
           <View style={styles.reeditFooter}>
             <OutlineButton
               label="Cancel"
-              onPress={() => setEditorState('grid')}
+              onPress={() => setEditorState("grid")}
               style={{ flex: 1 }}
             />
             <PrimaryButton
@@ -621,15 +753,19 @@ export default function DocumentEditScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
-      <SafeAreaView style={{ backgroundColor: theme.background }} edges={['top']} />
+      <SafeAreaView
+        style={{ backgroundColor: theme.background }}
+        edges={["top"]}
+      />
 
       <Header
         title="Document Editor"
         rightActions={[
           {
-            icon: 'square.and.arrow.up',
-            fallback: '↗',
-            onPress: () => router.push({ pathname: '/exportShare' as any, params: { id } }),
+            icon: "square.and.arrow.up",
+            fallback: "↗",
+            onPress: () =>
+              router.push({ pathname: "/exportShare" as any, params: { id } }),
           },
         ]}
       />
@@ -640,10 +776,24 @@ export default function DocumentEditScreen() {
         showsVerticalScrollIndicator={false}
       >
         {document && (
-          <View style={[styles.docInfoCard, { backgroundColor: theme.surface, borderColor: theme.border }, Shadows.sm]}>
+          <View
+            style={[
+              styles.docInfoCard,
+              { backgroundColor: theme.surface, borderColor: theme.border },
+              Shadows.sm,
+            ]}
+          >
             <View style={styles.docTitleRow}>
-              <Icon sf="doc.text.fill" fallback="📄" size={20} color={theme.primary} />
-              <Text style={[styles.docTitleText, { color: theme.text }]} numberOfLines={1}>
+              <Icon
+                sf="doc.text.fill"
+                fallback="📄"
+                size={20}
+                color={theme.primary}
+              />
+              <Text
+                style={[styles.docTitleText, { color: theme.text }]}
+                numberOfLines={1}
+              >
                 {document.name}
               </Text>
               <Pressable
@@ -654,13 +804,24 @@ export default function DocumentEditScreen() {
                 hitSlop={8}
                 style={styles.renameBtn}
               >
-                <Icon sf="pencil" fallback="✏️" size={14} color={theme.primary} />
+                <Icon
+                  sf="pencil"
+                  fallback="✏️"
+                  size={14}
+                  color={theme.primary}
+                />
               </Pressable>
             </View>
             <View style={styles.metaRow}>
-              <Text style={[styles.metaText, { color: theme.textSecondary }]}>Date: {document.date}</Text>
-              <View style={[styles.dot, { backgroundColor: theme.textSecondary }]} />
-              <Text style={[styles.metaText, { color: theme.textSecondary }]}>Pages: {document.pagesList.length}</Text>
+              <Text style={[styles.metaText, { color: theme.textSecondary }]}>
+                Date: {document.date}
+              </Text>
+              <View
+                style={[styles.dot, { backgroundColor: theme.textSecondary }]}
+              />
+              <Text style={[styles.metaText, { color: theme.textSecondary }]}>
+                Pages: {document.pagesList.length}
+              </Text>
             </View>
           </View>
         )}
@@ -674,42 +835,49 @@ export default function DocumentEditScreen() {
             iconFallback="+"
             style={styles.toolBtn}
           />
-          <PrimaryButton
-            label="Extract OCR"
-            onPress={() => router.push({ pathname: '/ocrRecognition' as any, params: { id } })}
-            icon="text.viewfinder"
-            iconFallback="T"
-            style={styles.toolBtn}
-          />
         </View>
 
         {/* Scanned Pages grid view */}
         <View style={styles.gridContainer}>
-          {document && document.pagesList && document.pagesList.map((page, index) => (
-            <PageGridItem
-              key={page.id}
-              page={page}
-              pageNum={index + 1}
-              isFirst={index === 0}
-              isLast={index === document.pagesList.length - 1}
-              onPress={() => handleStartReedit(page)}
-              onDelete={() => handleDeletePage(page.id)}
-              onRotate={() => handleRotatePage(page.id)}
-              onDuplicate={() => handleDuplicatePage(page)}
-              onPressMoveUp={() => handleMoveUp(index)}
-              onPressMoveDown={() => handleMoveDown(index)}
-            />
-          ))}
+          {document &&
+            document.pagesList &&
+            document.pagesList.map((page, index) => (
+              <PageGridItem
+                key={page.id}
+                page={page}
+                pageNum={index + 1}
+                isFirst={index === 0}
+                isLast={index === document.pagesList.length - 1}
+                onPress={() => handleStartReedit(page)}
+                onDelete={() => handleDeletePage(page.id)}
+                onRotate={() => handleRotatePage(page.id)}
+                onDuplicate={() => handleDuplicatePage(page)}
+                onPressMoveUp={() => handleMoveUp(index)}
+                onPressMoveDown={() => handleMoveDown(index)}
+              />
+            ))}
 
           {/* Scan next page insert button */}
           <Pressable
             style={[styles.insertCard, { borderColor: theme.border }]}
             onPress={handleAddPages}
           >
-            <View style={[styles.insertCircle, { backgroundColor: theme.primaryLight }]}>
-              <Icon sf="camera.fill" fallback="+" size={20} color={theme.primary} />
+            <View
+              style={[
+                styles.insertCircle,
+                { backgroundColor: theme.primaryLight },
+              ]}
+            >
+              <Icon
+                sf="camera.fill"
+                fallback="+"
+                size={20}
+                color={theme.primary}
+              />
             </View>
-            <Text style={[styles.insertText, { color: theme.textSecondary }]}>Scan Next Page</Text>
+            <Text style={[styles.insertText, { color: theme.textSecondary }]}>
+              Scan Next Page
+            </Text>
           </Pressable>
         </View>
 
@@ -717,15 +885,22 @@ export default function DocumentEditScreen() {
       </ScrollView>
 
       {/* Save Export CTA Bar */}
-      <View style={[styles.actionCtaBar, { backgroundColor: theme.surface, borderTopColor: theme.border }]}>
+      <View
+        style={[
+          styles.actionCtaBar,
+          { backgroundColor: theme.surface, borderTopColor: theme.border },
+        ]}
+      >
         <OutlineButton
           label="Back to Library"
-          onPress={() => router.replace('/home' as any)}
+          onPress={() => router.replace("/home" as any)}
           style={styles.ctaBtn}
         />
         <PrimaryButton
           label="Export PDF"
-          onPress={() => router.push({ pathname: '/exportShare' as any, params: { id } })}
+          onPress={() =>
+            router.push({ pathname: "/exportShare" as any, params: { id } })
+          }
           icon="square.and.arrow.up"
           iconFallback="↗"
           style={styles.ctaBtn}
@@ -735,10 +910,24 @@ export default function DocumentEditScreen() {
       {/* Rename Dialog Modal */}
       <Modal visible={showRenameModal} transparent animationType="fade">
         <View style={styles.modalBg}>
-          <View style={[styles.modalCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-            <Text style={[styles.modalTitle, { color: theme.text }]}>Rename Document</Text>
+          <View
+            style={[
+              styles.modalCard,
+              { backgroundColor: theme.surface, borderColor: theme.border },
+            ]}
+          >
+            <Text style={[styles.modalTitle, { color: theme.text }]}>
+              Rename Document
+            </Text>
             <TextInput
-              style={[styles.modalInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background }]}
+              style={[
+                styles.modalInput,
+                {
+                  color: theme.text,
+                  borderColor: theme.border,
+                  backgroundColor: theme.background,
+                },
+              ]}
               value={renameText}
               onChangeText={setRenameText}
               autoFocus
@@ -781,21 +970,21 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   docTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: Spacing.sm,
   },
   docTitleText: {
     fontSize: Typography.sizes.md,
-    fontWeight: '800',
+    fontWeight: "800",
     flex: 1,
   },
   renameBtn: {
     padding: Spacing.xs,
   },
   metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: Spacing.sm,
   },
   metaText: {
@@ -807,7 +996,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.full,
   },
   toolsRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: Spacing.sm,
     marginTop: Spacing.md,
     marginBottom: Spacing.lg,
@@ -816,9 +1005,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   gridContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
     gap: Spacing.md,
   },
   gridItem: {
@@ -829,69 +1018,69 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   gridItemHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   pageNumText: {
     fontSize: Typography.sizes.xs,
-    fontWeight: '800',
+    fontWeight: "800",
   },
   headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: Spacing.sm,
   },
   gridItemBody: {
     height: 160,
-    backgroundColor: '#1E1E1E',
+    backgroundColor: "#1E1E1E",
     borderRadius: Radius.xs,
     borderWidth: 1,
-    overflow: 'hidden',
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
+    overflow: "hidden",
+    position: "relative",
+    alignItems: "center",
+    justifyContent: "center",
   },
   pageThumbnailImage: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   editPageHint: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "rgba(0,0,0,0.5)",
+    alignItems: "center",
+    justifyContent: "center",
     opacity: 0.8,
   },
   editPageHintText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 9,
-    fontWeight: '800',
+    fontWeight: "800",
     marginTop: 4,
   },
   gridItemFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   footerActionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 3,
   },
   footerActionBtnText: {
     fontSize: 10,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   rearrangeControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 2,
   },
   arrowBtn: {
     padding: 3,
     borderRadius: Radius.xs,
-    backgroundColor: 'rgba(0,0,0,0.05)',
+    backgroundColor: "rgba(0,0,0,0.05)",
   },
   disabledArrow: {
     opacity: 0.15,
@@ -899,27 +1088,27 @@ const styles = StyleSheet.create({
   insertCard: {
     width: GRID_ITEM_W,
     height: 245,
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
     borderWidth: 1.5,
-    borderStyle: 'dashed',
+    borderStyle: "dashed",
     borderRadius: Radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     gap: Spacing.sm,
   },
   insertCircle: {
     width: 40,
     height: 40,
     borderRadius: Radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   insertText: {
     fontSize: Typography.sizes.sm,
-    fontWeight: '800',
+    fontWeight: "800",
   },
   actionCtaBar: {
-    flexDirection: 'row',
+    flexDirection: "row",
     paddingHorizontal: Spacing.md,
     paddingTop: Spacing.sm,
     paddingBottom: Spacing.md,
@@ -933,54 +1122,54 @@ const styles = StyleSheet.create({
   /* Re-edit Overlay screen */
   reeditContainer: {
     flex: 1,
-    justifyContent: 'space-between',
+    justifyContent: "space-between",
   },
   reeditHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: '#222222',
+    borderBottomColor: "#222222",
   },
   headerBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
   },
   reeditTitle: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: Typography.sizes.md,
-    fontWeight: '800',
+    fontWeight: "800",
   },
   previewCanvas: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     padding: Spacing.md,
   },
   reeditPreviewFrame: {
     width: SCREEN_W - 60,
     height: (SCREEN_W - 60) * 1.414,
-    backgroundColor: '#000',
+    backgroundColor: "#000",
     borderRadius: Radius.sm,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   reeditPreviewImage: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   reeditActionsRow: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: Spacing.xs,
   },
   reeditActionBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: "rgba(255, 255, 255, 0.12)",
     borderRadius: Radius.full,
     paddingHorizontal: Spacing.md,
     paddingVertical: 6,
@@ -988,12 +1177,12 @@ const styles = StyleSheet.create({
   },
   reeditActionBadgeText: {
     fontSize: 10,
-    fontWeight: '700',
-    color: '#FFFFFF',
+    fontWeight: "700",
+    color: "#FFFFFF",
   },
   reviewTabContainer: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    flexDirection: "row",
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
     borderRadius: Radius.md,
     marginHorizontal: Spacing.md,
     padding: 3,
@@ -1002,30 +1191,30 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 8,
     borderRadius: Radius.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   reviewTabActive: {
-    backgroundColor: '#00BFA5',
+    backgroundColor: "#00BFA5",
   },
   reviewTabText: {
-    color: '#A0A0A0',
-    fontWeight: '700',
+    color: "#A0A0A0",
+    fontWeight: "700",
     fontSize: 11,
   },
   reviewTabActiveText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
   },
   filterSection: {
     paddingVertical: Spacing.sm,
     gap: Spacing.xs,
   },
   filterSectionTitle: {
-    color: 'rgba(255,255,255,0.4)',
+    color: "rgba(255,255,255,0.4)",
     fontSize: 9,
-    fontWeight: '800',
+    fontWeight: "800",
     letterSpacing: 1,
-    textAlign: 'center',
+    textAlign: "center",
   },
   filterScroll: {
     paddingHorizontal: Spacing.md,
@@ -1033,25 +1222,25 @@ const styles = StyleSheet.create({
   },
   filterCard: {
     width: 65,
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.04)",
     borderWidth: 1.5,
-    borderColor: 'transparent',
+    borderColor: "transparent",
     borderRadius: Radius.xs,
     padding: Spacing.xs,
     gap: 4,
   },
   filterPreview: {
-    width: '100%',
+    width: "100%",
     height: 28,
     borderRadius: Radius.xs - 2,
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.1)',
+    borderColor: "rgba(0,0,0,0.1)",
   },
   filterCardText: {
     fontSize: 8.5,
-    fontWeight: '700',
-    color: 'rgba(255,255,255,0.6)',
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.6)",
   },
   adjustSection: {
     paddingVertical: Spacing.sm,
@@ -1059,69 +1248,69 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   sliderContainer: {
-    width: '100%',
+    width: "100%",
     gap: Spacing.xs,
   },
   sliderLabelRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   sliderLabelText: {
-    color: '#E0E0E0',
+    color: "#E0E0E0",
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   sliderValueText: {
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: "800",
   },
   sliderTrackWrapper: {
     height: 28,
-    justifyContent: 'center',
-    position: 'relative',
+    justifyContent: "center",
+    position: "relative",
   },
   sliderTrackBg: {
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#333333',
-    width: '100%',
-    overflow: 'hidden',
+    backgroundColor: "#333333",
+    width: "100%",
+    overflow: "hidden",
   },
   sliderTrackFill: {
-    height: '100%',
+    height: "100%",
   },
   sliderThumb: {
-    position: 'absolute',
+    position: "absolute",
     width: 16,
     height: 16,
     borderRadius: 8,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderWidth: 2,
     marginTop: -8,
-    top: '50%',
+    top: "50%",
     marginLeft: -8,
   },
   reeditFooter: {
-    flexDirection: 'row',
+    flexDirection: "row",
     paddingHorizontal: Spacing.md,
     paddingBottom: Spacing.sm,
     gap: Spacing.md,
   },
   globalLoader: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "rgba(0,0,0,0.5)",
+    alignItems: "center",
+    justifyContent: "center",
     zIndex: 99999,
   },
 
   /* Rename modal styles */
   modalBg: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "rgba(0,0,0,0.6)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   modalCard: {
     width: SCREEN_W - 48,
@@ -1132,7 +1321,7 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: Typography.sizes.md,
-    fontWeight: '800',
+    fontWeight: "800",
   },
   modalInput: {
     height: 44,
@@ -1142,7 +1331,7 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.sm,
   },
   modalButtons: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: Spacing.sm,
     marginTop: Spacing.xs,
   },

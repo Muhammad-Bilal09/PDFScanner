@@ -18,10 +18,11 @@ export interface SyncQueueItem {
 async function isOnline(): Promise<boolean> {
   try {
     const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), 3000);
+    const id = setTimeout(() => controller.abort(), 1500);
     const response = await fetch('https://www.google.com', {
       method: 'HEAD',
       signal: controller.signal,
+      cache: 'no-store',
     });
     clearTimeout(id);
     return response.ok;

@@ -6,8 +6,6 @@ import {
   Dimensions,
   Image,
   PanResponder,
-  GestureResponderEvent,
-  PanResponderGestureState,
 } from 'react-native';
 import Svg, { Polygon, Line } from 'react-native-svg';
 import { Point } from '@/services/processor';
@@ -16,7 +14,7 @@ import { Spacing, Radius, Typography, Shadows } from '@/theme';
 import { OutlineButton } from './OutlineButton';
 import { PrimaryButton } from './PrimaryButton';
 
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
+const { width: SCREEN_W } = Dimensions.get('window');
 
 interface DocumentCropViewProps {
   imageUri: string;
@@ -26,6 +24,13 @@ interface DocumentCropViewProps {
   onCancel: () => void;
   onSave: (points: Point[]) => void;
 }
+
+const DEFAULT_POINTS: Point[] = [
+  { x: 0.15, y: 0.15 },
+  { x: 0.85, y: 0.15 },
+  { x: 0.85, y: 0.85 },
+  { x: 0.15, y: 0.85 },
+];
 
 export function DocumentCropView({
   imageUri,
@@ -38,13 +43,26 @@ export function DocumentCropView({
   const theme = useTheme();
 
   // Corner state (array of 4 normalized points: TL, TR, BR, BL)
-  const [points, setPoints] = useState<Point[]>(initialPoints);
-  
+  const [points, setPoints] = useState<Point[]>(() => {
+    if (Array.isArray(initialPoints) && initialPoints.length === 4) {
+      return initialPoints;
+    }
+    return DEFAULT_POINTS;
+  });
+
+  const pointsRef = useRef<Point[]>(points);
+  pointsRef.current = points;
+
   // Track layout dimensions of the image canvas container
   const [containerSize, setContainerSize] = useState<{ width: number; height: number } | null>(null);
+  const containerRef = useRef<View>(null);
+  const containerPagePos = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // Drag states for magnifying glass
   const [activeCorner, setActiveCorner] = useState<number>(-1);
+  const activeCornerRef = useRef<number>(-1);
+  activeCornerRef.current = activeCorner;
+
   const [dragPosition, setDragPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // Calculate image fit dimensions and offsets inside the container
@@ -77,7 +95,10 @@ export function DocumentCropView({
     return { fitW, fitH, offsetX, offsetY };
   }, [containerSize, imageWidth, imageHeight]);
 
-  // Map normalized coordinate to screen coordinates
+  const layoutRef = useRef(layout);
+  layoutRef.current = layout;
+
+  // Map normalized coordinate to screen coordinates relative to container
   const getScreenCoords = (p: Point) => {
     if (!layout) return { x: 0, y: 0 };
     return {
@@ -86,36 +107,31 @@ export function DocumentCropView({
     };
   };
 
-  // Convert screen coordinates back to normalized (0 - 1) image coordinates
+  // Convert container-relative screen coordinates back to normalized (0 - 1) image coordinates
   const getNormalizedCoords = (x: number, y: number) => {
-    if (!layout) return { x: 0, y: 0 };
-    const nX = Math.max(0, Math.min(1, (x - layout.offsetX) / layout.fitW));
-    const nY = Math.max(0, Math.min(1, (y - layout.offsetY) / layout.fitH));
+    const l = layoutRef.current;
+    if (!l) return { x: 0, y: 0 };
+    const nX = Math.max(0, Math.min(1, (x - l.offsetX) / l.fitW));
+    const nY = Math.max(0, Math.min(1, (y - l.offsetY) / l.fitH));
     return { x: nX, y: nY };
   };
 
-  // Render SVG connection lines connecting points: 0->1->2->3->0
-  const polyPointsString = useMemo(() => {
-    if (!layout) return '';
-    return points
-      .map((p) => {
-        const s = getScreenCoords(p);
-        return `${s.x},${s.y}`;
-      })
-      .join(' ');
-  }, [points, layout]);
-
   // Determine closest corner to the touch start
-  const handleTouchStart = (event: GestureResponderEvent) => {
-    if (!layout) return;
-    const { locationX, locationY } = event.nativeEvent;
-    
-    // Find the handle within a touch tolerance threshold (40px)
-    let closestIndex = -1;
-    let minDistance = 40; // max touch radius
+  const handleTouchStart = (pageX: number, pageY: number) => {
+    const l = layoutRef.current;
+    if (!l) return;
 
-    points.forEach((p, idx) => {
-      const s = getScreenCoords(p);
+    const locationX = pageX - containerPagePos.current.x;
+    const locationY = pageY - containerPagePos.current.y;
+    
+    let closestIndex = -1;
+    let minDistance = 50; // max touch radius in px
+
+    pointsRef.current.forEach((p, idx) => {
+      const s = {
+        x: l.offsetX + p.x * l.fitW,
+        y: l.offsetY + p.y * l.fitH,
+      };
       const dist = Math.hypot(locationX - s.x, locationY - s.y);
       if (dist < minDistance) {
         minDistance = dist;
@@ -125,6 +141,7 @@ export function DocumentCropView({
 
     if (closestIndex !== -1) {
       setActiveCorner(closestIndex);
+      activeCornerRef.current = closestIndex;
       setDragPosition({ x: locationX, y: locationY });
     }
   };
@@ -135,36 +152,36 @@ export function DocumentCropView({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: (evt) => {
-        handleTouchStart(evt);
-      },
-      onPanResponderMove: (evt, gestureState) => {
-        if (!layout) return;
-        
-        // Find which corner we are dragging
-        // To be safe, look at activeCorner
-        setActiveCorner((currentActive) => {
-          if (currentActive === -1) return -1;
-          
-          const touchX = evt.nativeEvent.locationX;
-          const touchY = evt.nativeEvent.locationY;
-
-          setDragPosition({ x: touchX, y: touchY });
-          const norm = getNormalizedCoords(touchX, touchY);
-
-          setPoints((prevPoints) => {
-            const updated = [...prevPoints];
-            updated[currentActive] = norm;
-            return updated;
-          });
-
-          return currentActive;
+        const { pageX, pageY } = evt.nativeEvent;
+        containerRef.current?.measureInWindow((x, y) => {
+          if (x || y) {
+            containerPagePos.current = { x, y };
+          }
+          handleTouchStart(pageX, pageY);
         });
+      },
+      onPanResponderMove: (evt) => {
+        const curActive = activeCornerRef.current;
+        if (curActive === -1 || !layoutRef.current) return;
+        
+        const { pageX, pageY } = evt.nativeEvent;
+        const locationX = pageX - containerPagePos.current.x;
+        const locationY = pageY - containerPagePos.current.y;
+
+        setDragPosition({ x: locationX, y: locationY });
+        const norm = getNormalizedCoords(locationX, locationY);
+
+        const updated = [...pointsRef.current];
+        updated[curActive] = norm;
+        setPoints(updated);
       },
       onPanResponderRelease: () => {
         setActiveCorner(-1);
+        activeCornerRef.current = -1;
       },
       onPanResponderTerminate: () => {
         setActiveCorner(-1);
+        activeCornerRef.current = -1;
       },
     })
   ).current;
@@ -173,6 +190,14 @@ export function DocumentCropView({
   const screenPoints = useMemo(() => {
     return points.map((p) => getScreenCoords(p));
   }, [points, layout]);
+
+  // Render SVG connection lines connecting points: 0->1->2->3->0
+  const polyPointsString = useMemo(() => {
+    if (!layout) return '';
+    return screenPoints
+      .map((s) => `${s.x},${s.y}`)
+      .join(' ');
+  }, [screenPoints, layout]);
 
   // Magnifier layout details
   const magnifierOffset = useMemo(() => {
@@ -185,13 +210,11 @@ export function DocumentCropView({
     
     const s = getScreenCoords(corner);
     
-    // We want the magnifier to center on the active corner coordinate s.x, s.y
     const imgLeft = magSize / 2 - (s.x - layout.offsetX) * zoom;
     const imgTop = magSize / 2 - (s.y - layout.offsetY) * zoom;
 
-    // Magnifier container style: Position it floating above the finger
     const floatLeft = Math.max(10, Math.min(SCREEN_W - magSize - 10, dragPosition.x - magSize / 2));
-    const floatTop = Math.max(10, dragPosition.y - magSize - 40); // 40px above finger
+    const floatTop = Math.max(10, dragPosition.y - magSize - 40);
 
     return {
       imgLeft,
@@ -213,10 +236,16 @@ export function DocumentCropView({
 
       {/* Main Canvas Viewport */}
       <View
+        ref={containerRef}
         style={styles.canvasContainer}
         onLayout={(e) => {
           const { width, height } = e.nativeEvent.layout;
           setContainerSize({ width, height });
+          containerRef.current?.measureInWindow((x, y) => {
+            if (x || y) {
+              containerPagePos.current = { x, y };
+            }
+          });
         }}
         {...panResponder.panHandlers}
       >
@@ -430,3 +459,4 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
+

@@ -1,30 +1,30 @@
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import React, { useState, useRef, useEffect } from 'react';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  LayoutChangeEvent,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
-  LayoutChangeEvent,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { CameraView, useCameraPermissions } from 'expo-camera';
-import { Image } from 'expo-image';
-import * as ImagePicker from 'expo-image-picker';
 import Animated, {
-  useSharedValue,
+  runOnJS,
   useAnimatedStyle,
-  withSpring,
-  withTiming,
+  useSharedValue,
   withRepeat,
   withSequence,
-  runOnJS,
+  withSpring,
+  withTiming,
 } from 'react-native-reanimated';
-import Svg, { Polygon } from 'react-native-svg';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Polygon } from 'react-native-svg';
 let DocumentScanner: any = null;
 try {
   DocumentScanner = require('react-native-document-scanner-plugin').default || require('react-native-document-scanner-plugin');
@@ -32,16 +32,15 @@ try {
   // Native module not loaded or not linked in the current binary
 }
 
-import { useTheme } from '@/hooks/use-theme';
-import { useDocuments } from '@/hooks/use-documents';
-import { Spacing, Radius, Typography, Shadows } from '@/theme';
-import { Icon } from '@/components/shared/Icon';
-import { PrimaryButton } from '@/components/shared/PrimaryButton';
-import { OutlineButton } from '@/components/shared/OutlineButton';
 import { PageItemType } from '@/components/shared/DocumentCard';
-import { ImageProcessor, Point } from '@/services/processor';
 import { DocumentCropView } from '@/components/shared/DocumentCropView';
-import { CloudSyncManager } from '@/services/cloud-sync';
+import { Icon } from '@/components/shared/Icon';
+import { OutlineButton } from '@/components/shared/OutlineButton';
+import { PrimaryButton } from '@/components/shared/PrimaryButton';
+import { useDocuments } from '@/hooks/use-documents';
+import { useTheme } from '@/hooks/use-theme';
+import { ImageProcessor, Point } from '@/services/processor';
+import { Radius, Shadows, Spacing, Typography } from '@/theme';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
@@ -126,6 +125,17 @@ export default function ScanScreen() {
   const lastCornersRef = useRef<Point[]>([]);
   const stableCountRef = useRef(0);
 
+  // Handle imported gallery image route param
+  useEffect(() => {
+    if (importUri) {
+      processCapturedImage(
+        importUri,
+        width ? Number(width) : 800,
+        height ? Number(height) : 1000
+      );
+    }
+  }, [importUri]);
+
   // Auto-trigger native scanner on mount if available
   useEffect(() => {
     if (isNativeScannerAvailable && viewState === 'camera') {
@@ -170,7 +180,7 @@ export default function ScanScreen() {
 
   // Background capture edge-detection snaps ONLY when auto-capture is toggled on
   useEffect(() => {
-    let detectInterval: NodeJS.Timeout | null = null;
+    let detectInterval: ReturnType<typeof setInterval> | null = null;
 
     if (viewState === 'camera' && permission?.granted && autoCaptureEnabled && !isNativeScannerAvailable) {
       setGuidancePrompt('SEARCHING FOR DOCUMENT...');
@@ -190,7 +200,7 @@ export default function ScanScreen() {
             if (detectResult && detectResult.points && detectResult.points.length === 4) {
               const points = detectResult.points;
               const isFallback = points.every(p => p.x === 0.15 || p.x === 0.85);
-              
+
               if (!isFallback) {
                 runOnJS(setLiveCorners)(points);
                 borderOpacity.value = withSpring(1.0);
@@ -275,7 +285,7 @@ export default function ScanScreen() {
     return () => clearTimeout(timer);
   }, [countdown]);
 
-  const resetLiveBorder = () => {
+  function resetLiveBorder() {
     setLiveCorners([
       { x: 0.15, y: 0.25 },
       { x: 0.85, y: 0.25 },
@@ -285,7 +295,7 @@ export default function ScanScreen() {
     borderOpacity.value = withSpring(0.4);
     setIsStable(false);
     setGuidancePrompt(autoCaptureEnabled ? 'SEARCHING FOR DOCUMENT...' : 'ALIGN DOCUMENT IN FRAME');
-  };
+  }
 
   // Compile points string for standard SVG
   const polyPointsString = liveCorners
@@ -317,7 +327,7 @@ export default function ScanScreen() {
   });
 
   // Launch Native Document Scanner (VNDocumentCameraViewController on iOS, ML Kit on Android)
-  const handleLaunchNativeScanner = async () => {
+  async function handleLaunchNativeScanner() {
     setProcessing(true);
     setProcessingMessage('Launching scanner...');
     try {
@@ -325,9 +335,9 @@ export default function ScanScreen() {
 
       if (scannedImages && scannedImages.length > 0) {
         setProcessingMessage('Processing scanned page...');
-        
+
         // Native scanner returns already cropped and enhanced document image paths
-        const pages: PageItemType[] = scannedImages.map((uri) => {
+        const pages: PageItemType[] = scannedImages.map((uri: any) => {
           const pageId = Math.random().toString(36).substring(2, 9);
           return {
             id: pageId,
@@ -369,8 +379,7 @@ export default function ScanScreen() {
             docId = newDoc.id;
           }
 
-          await CloudSyncManager.addToQueue({ docId, pageId: newPage.id, fileUri: newPage.processedUri, type: 'processed' });
-          await CloudSyncManager.addToQueue({ docId, pageId: newPage.id, fileUri: newPage.originalUri, type: 'original' });
+
 
           resetScanState();
           router.replace({
@@ -403,7 +412,7 @@ export default function ScanScreen() {
   if (!permission && !isNativeScannerAvailable) {
     return (
       <View style={[styles.fallbackContainer, { backgroundColor: '#121212' }]}>
-        <ActivityIndicator size="large" color="#00BFA5" />
+        <ActivityIndicator size="large" color={theme.primary} />
         <Text style={styles.fallbackText}>Initializing camera...</Text>
       </View>
     );
@@ -414,7 +423,7 @@ export default function ScanScreen() {
       <View style={[styles.fallbackContainer, { backgroundColor: '#121212' }]}>
         <SafeAreaView style={styles.permissionCard} edges={['top', 'bottom']}>
           <View style={styles.permissionIconBox}>
-            <Icon sf="camera.fill" fallback="📷" size={40} color="#00BFA5" />
+            <Icon sf="camera.fill" fallback="📷" size={40} color={theme.primary} />
           </View>
           <Text style={styles.permissionTitle}>Camera Permission Required</Text>
           <Text style={styles.permissionDescription}>
@@ -434,7 +443,7 @@ export default function ScanScreen() {
   }
 
   // Camera high-res capture handler (CamScanner model fallback)
-  const handleCapture = async () => {
+  async function handleCapture() {
     if (processing || !cameraRef.current) return;
     setProcessing(true);
     setProcessingMessage('Capturing photo...');
@@ -446,20 +455,20 @@ export default function ScanScreen() {
       });
 
       captureButtonScale.value = withSpring(1);
-      
+
       if (photo && photo.uri) {
         setProcessingMessage('Aligning document...');
-        
+
         // 1. Instant border detection on the captured photo
         const detectResult = await ImageProcessor.detectEdges(photo.uri);
         const points = (detectResult && detectResult.points && detectResult.points.length === 4)
           ? detectResult.points
           : [
-              { x: 0.15, y: 0.15 },
-              { x: 0.85, y: 0.15 },
-              { x: 0.85, y: 0.85 },
-              { x: 0.15, y: 0.85 }
-            ];
+            { x: 0.15, y: 0.15 },
+            { x: 0.85, y: 0.15 },
+            { x: 0.85, y: 0.85 },
+            { x: 0.15, y: 0.85 }
+          ];
 
         setCurrentOriginalUri(photo.uri);
         setImageWidth(photo.width);
@@ -472,9 +481,9 @@ export default function ScanScreen() {
           points,
           currentFilter
         );
-        
+
         setCurrentWarpedUri(warpedPath);
-        
+
         // 3. Directly transition to the Review/Filter view
         setViewState('review');
       } else {
@@ -486,10 +495,10 @@ export default function ScanScreen() {
     } finally {
       setProcessing(false);
     }
-  };
+  }
 
   // Gallery import selector
-  const handleImportGallery = async () => {
+  async function handleImportGallery() {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
@@ -506,9 +515,9 @@ export default function ScanScreen() {
     } catch (e) {
       Alert.alert('Import Error', 'Failed to load image from photo library.');
     }
-  };
+  }
 
-  const processCapturedImage = async (uri: string, width: number, height: number) => {
+  async function processCapturedImage(uri: string, width: number, height: number) {
     setBatchReviewIndex(batchPages.length);
     setCurrentOriginalUri(uri);
     setImageWidth(width);
@@ -521,13 +530,13 @@ export default function ScanScreen() {
       const points = (detectResult && detectResult.points && detectResult.points.length === 4)
         ? detectResult.points
         : [
-            { x: 0.15, y: 0.15 },
-            { x: 0.85, y: 0.15 },
-            { x: 0.85, y: 0.85 },
-            { x: 0.15, y: 0.85 }
-          ];
+          { x: 0.15, y: 0.15 },
+          { x: 0.85, y: 0.15 },
+          { x: 0.85, y: 0.85 },
+          { x: 0.15, y: 0.85 }
+        ];
       setCurrentCorners(points);
-      
+
       const warpedPath = await ImageProcessor.warpAndEnhance(
         uri,
         points,
@@ -641,18 +650,7 @@ export default function ScanScreen() {
         docId = newDoc.id;
       }
 
-      await CloudSyncManager.addToQueue({
-        docId,
-        pageId: newPage.id,
-        fileUri: newPage.processedUri,
-        type: 'processed',
-      });
-      await CloudSyncManager.addToQueue({
-        docId,
-        pageId: newPage.id,
-        fileUri: newPage.originalUri,
-        type: 'original',
-      });
+
 
       resetScanState();
       router.push({
@@ -710,7 +708,7 @@ export default function ScanScreen() {
           const updated = [...batchPages];
           updated.splice(idx, 1);
           setBatchPages(updated);
-          
+
           if (updated.length === 0) {
             resetScanState();
           } else {
@@ -750,24 +748,11 @@ export default function ScanScreen() {
         docId = newDoc.id;
       }
 
-      for (const page of batchPages) {
-        await CloudSyncManager.addToQueue({
-          docId,
-          pageId: page.id,
-          fileUri: page.processedUri,
-          type: 'processed',
-        });
-        await CloudSyncManager.addToQueue({
-          docId,
-          pageId: page.id,
-          fileUri: page.originalUri,
-          type: 'original',
-        });
-      }
+
 
       setBatchPages([]);
       resetScanState();
-      
+
       router.push({
         pathname: '/documentEdit' as any,
         params: { id: docId },
@@ -779,14 +764,14 @@ export default function ScanScreen() {
     }
   };
 
-  const resetScanState = () => {
+  function resetScanState() {
     setCurrentOriginalUri(null);
     setCurrentWarpedUri(null);
     setCurrentCorners([]);
     setCurrentFilter('magic');
     setCurrentRotation(0);
     setViewState('camera');
-  };
+  }
 
   const handleLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
@@ -848,8 +833,8 @@ export default function ScanScreen() {
           <Animated.View style={[styles.canvasOverlay, animatedOverlayStyle]}>
             <Polygon
               points={polyPointsString}
-              fill={isStable ? 'rgba(0, 230, 118, 0.22)' : 'rgba(0, 191, 165, 0.18)'}
-              stroke={isStable ? '#00E676' : '#00BFA5'}
+              fill={isStable ? 'rgba(239, 68, 68, 0.22)' : 'rgba(96, 165, 250, 0.15)'}
+              stroke={isStable ? '#EF4444' : '#60A5FA'}
               strokeWidth="2.5"
             />
           </Animated.View>
@@ -859,8 +844,8 @@ export default function ScanScreen() {
             style={[
               styles.laserLine,
               {
-                backgroundColor: isStable ? '#00E676' : '#00BFA5',
-                shadowColor: isStable ? '#00E676' : '#00BFA5',
+                backgroundColor: isStable ? '#EF4444' : '#60A5FA',
+                shadowColor: isStable ? '#EF4444' : '#60A5FA',
               },
               animatedLaserStyle,
             ]}
@@ -879,14 +864,14 @@ export default function ScanScreen() {
               styles.statusBadge,
               {
                 backgroundColor: 'rgba(18, 18, 18, 0.85)',
-                borderColor: isStable ? '#00E676' : 'rgba(255,255,255,0.15)',
+                borderColor: isStable ? '#EF4444' : 'rgba(255,255,255,0.15)',
               }
             ]}>
               <View style={[
                 styles.statusBadgeDot,
-                { backgroundColor: isStable ? '#00E676' : '#FF9800' }
+                { backgroundColor: isStable ? '#EF4444' : '#FF9800' }
               ]} />
-              <Text style={[styles.statusBadgeText, isStable && { color: '#00E676' }]}>
+              <Text style={[styles.statusBadgeText, isStable && { color: '#EF4444' }]}>
                 {guidancePrompt}
               </Text>
             </View>
@@ -898,7 +883,7 @@ export default function ScanScreen() {
           {/* Top container containing statusbar spacing */}
           <View style={styles.topContainer} pointerEvents="box-none">
             <SafeAreaView edges={['top']} pointerEvents="none" style={{ height: 0 }} />
-            
+
             {/* Top glassmorphic options bar */}
             <View style={[styles.topBar, Shadows.sm]}>
               <Pressable
@@ -1272,7 +1257,7 @@ const styles = StyleSheet.create({
     marginTop: Spacing.xs,
   },
   cancelBtnText: {
-    color: '#00BFA5',
+    color: '#EF4444',
     fontWeight: '700',
     fontSize: Typography.sizes.sm,
   },

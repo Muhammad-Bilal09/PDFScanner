@@ -349,28 +349,7 @@ export default function ExportShareScreen() {
           </View>
         )}
 
-        {/* Cloud success metadata panel */}
-        {uploadedUrl && (
-          <View style={[styles.successCard, { backgroundColor: theme.surface, borderColor: theme.success }]}>
-            <View style={styles.successHeader}>
-              <Icon sf="checkmark.circle.fill" fallback="✓" size={18} color={theme.success} />
-              <Text style={[styles.successTitle, { color: theme.success }]}>Uploaded to Cloudinary</Text>
-            </View>
-            <Text style={[styles.successUrlText, { color: theme.textSecondary }]} numberOfLines={1}>
-              {uploadedUrl}
-            </Text>
-            <View style={styles.successActions}>
-              <Pressable style={[styles.actionBadgeBtn, { borderColor: theme.border }]} onPress={handleCopyLink}>
-                <Icon sf="link" fallback="🔗" size={12} color={theme.primary} />
-                <Text style={[styles.actionBadgeBtnText, { color: theme.primary }]}>Copy Link</Text>
-              </Pressable>
-              <Pressable style={[styles.actionBadgeBtn, { borderColor: theme.border }]} onPress={handleOpenLink}>
-                <Icon sf="doc.text" fallback="🌐" size={12} color={theme.primary} />
-                <Text style={[styles.actionBadgeBtnText, { color: theme.primary }]}>Open Browser</Text>
-              </Pressable>
-            </View>
-          </View>
-        )}
+
 
         {/* Share apps grid */}
         <Text style={[styles.sectionHeading, { color: theme.text }]}>Quick Actions</Text>
@@ -387,20 +366,6 @@ export default function ExportShareScreen() {
               <Icon sf="printer.fill" fallback="🖨" size={18} color="#FFFFFF" />
             </View>
             <Text style={[styles.appLabel, { color: theme.textSecondary }]}>Print</Text>
-          </Pressable>
-
-          <Pressable style={styles.appBtn} onPress={handleUploadCloudinary} disabled={status === 'uploading'}>
-            <View style={[styles.appIconCircle, { backgroundColor: '#FF9800', opacity: status === 'uploading' ? 0.5 : 1 }]}>
-              <Icon sf="cloud.fill" fallback="☁" size={18} color="#FFFFFF" />
-            </View>
-            <Text style={[styles.appLabel, { color: theme.textSecondary }]}>Cloud Upload</Text>
-          </Pressable>
-
-          <Pressable style={styles.appBtn} onPress={handleCopyLink}>
-            <View style={[styles.appIconCircle, { backgroundColor: '#9C27B0' }]}>
-              <Icon sf="link" fallback="🔗" size={18} color="#FFFFFF" />
-            </View>
-            <Text style={[styles.appLabel, { color: theme.textSecondary }]}>Copy Link</Text>
           </Pressable>
         </View>
 

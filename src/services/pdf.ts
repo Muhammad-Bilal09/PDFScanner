@@ -1,7 +1,7 @@
 import * as Print from 'expo-print';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { Paths } from 'expo-file-system';
-import { moveAsync, getInfoAsync } from 'expo-file-system/legacy';
+import { moveAsync, getInfoAsync, readAsStringAsync, EncodingType } from 'expo-file-system/legacy';
 import { PageItemType } from '@/components/shared/DocumentCard';
 
 const cacheDirectory = Paths.cache.uri.endsWith('/') ? Paths.cache.uri : Paths.cache.uri + '/';
@@ -72,8 +72,8 @@ export const PdfService = {
       throw new Error('Cannot generate PDF for an empty document.');
     }
 
-    // Step 1: Compress and optimize page images
-    const optimizedUris: string[] = [];
+    // Step 1: Compress, optimize, and convert page images to Base64
+    const pageDataUris: string[] = [];
     for (let i = 0; i < pagesList.length; i++) {
       const page = pagesList[i];
       // Apply rotation if needed
@@ -91,18 +91,25 @@ export const PdfService = {
         }
       }
       const compUri = await this.compressPage(processedUri, quality);
-      optimizedUris.push(compUri);
+
+      try {
+        const base64Data = await readAsStringAsync(compUri, { encoding: EncodingType.Base64 });
+        pageDataUris.push(`data:image/jpeg;base64,${base64Data}`);
+      } catch (e) {
+        console.warn('[PdfService] Failed to read image as base64, using uri:', e);
+        pageDataUris.push(compUri);
+      }
     }
 
-    // Step 2: Build HTML structure
+    // Step 2: Build HTML structure with base64 images
     const watermarkHtml = removeWatermark
       ? ''
       : '<div style="position: absolute; bottom: 12px; right: 12px; font-size: 11px; color: rgba(0,0,0,0.35); font-family: system-ui, sans-serif; font-weight: 600; letter-spacing: 0.5px;">Scanned by DocScan Pro</div>';
 
-    const pagesHtml = optimizedUris
-      .map((uri) => `
+    const pagesHtml = pageDataUris
+      .map((dataUri) => `
         <div class="page-container">
-          <img src="${uri}" />
+          <img src="${dataUri}" />
           ${watermarkHtml}
         </div>
       `)
