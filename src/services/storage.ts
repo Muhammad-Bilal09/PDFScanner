@@ -18,41 +18,7 @@ const DEFAULT_SETTINGS: AppSettings = {
 };
 
 // Initial sample documents
-const SAMPLE_DOCUMENTS: DocumentItemType[] = [
-  {
-    id: '10',
-    name: 'Q3_Financial_Statement_2023.pdf',
-    date: 'Oct 12, 2023',
-    size: '2.4 MB',
-    pages: 0,
-    thumbColor: '#E6F4F1',
-    pagesList: [],
-    tags: ['Business'],
-    favorite: false,
-  },
-  {
-    id: '11',
-    name: 'Lunch_Receipt_Starbucks.jpg',
-    date: 'Today, 1:45 PM',
-    size: '850 KB',
-    pages: 0,
-    thumbColor: '#F2F2F2',
-    pagesList: [],
-    tags: ['Personal', 'Invoices'],
-    favorite: true,
-  },
-  {
-    id: '12',
-    name: 'Office_Layout_Draft_v2.pdf',
-    date: 'Oct 10, 2023',
-    size: '5.1 MB',
-    pages: 0,
-    thumbColor: '#EBEFF5',
-    pagesList: [],
-    tags: ['Business'],
-    favorite: false,
-  },
-];
+const SAMPLE_DOCUMENTS: DocumentItemType[] = [];
 
 export const LocalStorage = {
   // Onboarding
@@ -96,13 +62,16 @@ export const LocalStorage = {
     try {
       const val = await AsyncStorage.getItem(DOCUMENTS_KEY);
       if (!val) {
-        // Seed initial mock docs
-        await AsyncStorage.setItem(DOCUMENTS_KEY, JSON.stringify(SAMPLE_DOCUMENTS));
-        return SAMPLE_DOCUMENTS;
+        return [];
       }
-      return JSON.parse(val);
+      const parsed = JSON.parse(val) as DocumentItemType[];
+      const cleaned = parsed.filter(doc => doc.id !== '10' && doc.id !== '11' && doc.id !== '12');
+      if (cleaned.length !== parsed.length) {
+        await this.saveDocuments(cleaned);
+      }
+      return cleaned;
     } catch {
-      return SAMPLE_DOCUMENTS;
+      return [];
     }
   },
 
@@ -116,9 +85,11 @@ export const LocalStorage = {
 
   async addDocument(doc: Omit<DocumentItemType, 'id' | 'date'>): Promise<DocumentItemType> {
     const docs = await this.getDocuments();
+    const now = Date.now();
     const newDoc: DocumentItemType = {
       ...doc,
-      id: Math.random().toString(36).substring(2, 9),
+      id: `doc_${now}_${Math.random().toString(36).substring(2, 6)}`,
+      createdAt: now,
       date: new Date().toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',

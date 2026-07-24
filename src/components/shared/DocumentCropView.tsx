@@ -98,6 +98,15 @@ export function DocumentCropView({
   const layoutRef = useRef(layout);
   layoutRef.current = layout;
 
+  // Convert page screen coordinates to container relative coordinates
+  const getContainerRelativeCoords = (pageX: number, pageY: number) => {
+    const pos = containerPagePos.current;
+    return {
+      x: pageX - pos.x,
+      y: pageY - pos.y,
+    };
+  };
+
   // Map normalized coordinate to screen coordinates relative to container
   const getScreenCoords = (p: Point) => {
     if (!layout) return { x: 0, y: 0 };
@@ -121,18 +130,17 @@ export function DocumentCropView({
     const l = layoutRef.current;
     if (!l) return;
 
-    const locationX = pageX - containerPagePos.current.x;
-    const locationY = pageY - containerPagePos.current.y;
+    const rel = getContainerRelativeCoords(pageX, pageY);
     
     let closestIndex = -1;
-    let minDistance = 50; // max touch radius in px
+    let minDistance = 70; // max touch radius in px
 
     pointsRef.current.forEach((p, idx) => {
       const s = {
         x: l.offsetX + p.x * l.fitW,
         y: l.offsetY + p.y * l.fitH,
       };
-      const dist = Math.hypot(locationX - s.x, locationY - s.y);
+      const dist = Math.hypot(rel.x - s.x, rel.y - s.y);
       if (dist < minDistance) {
         minDistance = dist;
         closestIndex = idx;
@@ -142,7 +150,7 @@ export function DocumentCropView({
     if (closestIndex !== -1) {
       setActiveCorner(closestIndex);
       activeCornerRef.current = closestIndex;
-      setDragPosition({ x: locationX, y: locationY });
+      setDragPosition({ x: rel.x, y: rel.y });
     }
   };
 
@@ -153,23 +161,17 @@ export function DocumentCropView({
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: (evt) => {
         const { pageX, pageY } = evt.nativeEvent;
-        containerRef.current?.measureInWindow((x, y) => {
-          if (x || y) {
-            containerPagePos.current = { x, y };
-          }
-          handleTouchStart(pageX, pageY);
-        });
+        handleTouchStart(pageX, pageY);
       },
       onPanResponderMove: (evt) => {
         const curActive = activeCornerRef.current;
         if (curActive === -1 || !layoutRef.current) return;
         
         const { pageX, pageY } = evt.nativeEvent;
-        const locationX = pageX - containerPagePos.current.x;
-        const locationY = pageY - containerPagePos.current.y;
+        const rel = getContainerRelativeCoords(pageX, pageY);
 
-        setDragPosition({ x: locationX, y: locationY });
-        const norm = getNormalizedCoords(locationX, locationY);
+        setDragPosition({ x: rel.x, y: rel.y });
+        const norm = getNormalizedCoords(rel.x, rel.y);
 
         const updated = [...pointsRef.current];
         updated[curActive] = norm;
@@ -250,10 +252,10 @@ export function DocumentCropView({
         {...panResponder.panHandlers}
       >
         {layout && containerSize && (
-          <View style={styles.innerCanvas}>
+          <View style={styles.innerCanvas} pointerEvents="box-none">
             {/* Base Image */}
-            <Image
-              source={{ uri: imageUri }}
+            <View
+              pointerEvents="none"
               style={[
                 styles.canvasImage,
                 {
@@ -263,11 +265,16 @@ export function DocumentCropView({
                   top: layout.offsetY,
                 },
               ]}
-              resizeMode="contain"
-            />
+            >
+              <Image
+                source={{ uri: imageUri }}
+                style={StyleSheet.absoluteFill}
+                resizeMode="contain"
+              />
+            </View>
 
             {/* Svg Quad Border Overlay */}
-            <Svg style={StyleSheet.absoluteFill}>
+            <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
               {/* Highlight area */}
               <Polygon
                 points={polyPointsString}
@@ -300,6 +307,7 @@ export function DocumentCropView({
             {screenPoints.map((pt, idx) => (
               <View
                 key={idx}
+                pointerEvents="none"
                 style={[
                   styles.handleCircleOuter,
                   {
@@ -325,6 +333,7 @@ export function DocumentCropView({
                   },
                   Shadows.lg,
                 ]}
+                pointerEvents="none"
               >
                 <Image
                   source={{ uri: imageUri }}

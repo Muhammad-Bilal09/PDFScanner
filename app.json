@@ -42,12 +42,30 @@
         }
       ],
       "expo-image",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "DocScan Pro requires camera access to scan documents."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "DocScan Pro requires photo library access to import document images."
+        }
+      ],
       "expo-status-bar",
       "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "5047cc12-3e9b-4bad-b5f0-4c44f1206c10"
+      }
     }
   }
 }

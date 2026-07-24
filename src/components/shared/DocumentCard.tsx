@@ -21,6 +21,7 @@ export interface DocumentItemType {
   id: string;
   name: string;
   date: string;
+  createdAt?: number;
   size: string;
   pages: number;
   thumbColor?: string;

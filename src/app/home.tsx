@@ -1,21 +1,22 @@
-import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-    Alert,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { pickPhotoWithPermissions } from "@/utils/photo-picker";
+
 import { BottomSheet } from "@/components/shared/BottomSheet";
 import {
-    DocumentCard,
-    DocumentItemType,
+  DocumentCard,
+  DocumentItemType,
 } from "@/components/shared/DocumentCard";
 import { Icon } from "@/components/shared/Icon";
 import { TabBar } from "@/components/tabBar";
@@ -130,32 +131,29 @@ export default function HomeScreen() {
   };
 
   const handleImportGallery = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ["images"],
-        allowsEditing: false,
-        quality: 0.9,
+    const picked = await pickPhotoWithPermissions();
+    if (picked) {
+      router.push({
+        pathname: "/scan" as any,
+        params: {
+          importUri: picked.uri,
+          width: picked.width,
+          height: picked.height,
+        },
       });
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const asset = result.assets[0];
-        router.push({
-          pathname: "/scan" as any,
-          params: {
-            importUri: asset.uri,
-            width: asset.width || 800,
-            height: asset.height || 1000,
-          },
-        });
-      }
-    } catch (e) {
-      Alert.alert("Import Error", "Failed to load photo library.");
     }
   };
 
-  // Recent scans (last 3 items)
-  const recentDocs = React.useMemo(() => {
-    return [...documents].sort((a, b) => b.id.localeCompare(a.id)).slice(0, 3);
+  // Sorted documents (most recent scan/import strictly at the top)
+  const sortedDocs = React.useMemo(() => {
+    return [...documents].sort((a, b) => {
+      const timeA = a.createdAt || (a.id.startsWith('doc_') ? parseInt(a.id.split('_')[1], 10) || 0 : 0);
+      const timeB = b.createdAt || (b.id.startsWith('doc_') ? parseInt(b.id.split('_')[1], 10) || 0 : 0);
+      if (timeA !== timeB) {
+        return timeB - timeA;
+      }
+      return documents.indexOf(a) - documents.indexOf(b);
+    });
   }, [documents]);
 
   return (
@@ -247,16 +245,9 @@ export default function HomeScreen() {
           <Text style={[styles.sectionHeading, { color: theme.text }]}>
             Recent Documents
           </Text>
-          {documents.length > 3 && (
-            <Pressable onPress={() => router.replace("/files" as any)}>
-              <Text style={[styles.viewAllBtnText, { color: theme.primary }]}>
-                View All
-              </Text>
-            </Pressable>
-          )}
         </View>
 
-        {recentDocs.length === 0 ? (
+        {sortedDocs.length === 0 ? (
           <View
             style={[
               styles.emptyRecentCard,
@@ -277,7 +268,7 @@ export default function HomeScreen() {
           </View>
         ) : (
           <View style={styles.docsListWrap}>
-            {recentDocs.map((item) => (
+            {sortedDocs.map((item) => (
               <View key={item.id} style={styles.cardItemWrapper}>
                 <DocumentCard
                   item={item}
@@ -290,10 +281,14 @@ export default function HomeScreen() {
         )}
 
         {/* Quick Tools Panel */}
-        <Text
+        {/* <Text
           style={[
             styles.sectionHeading,
-            { color: theme.text, marginTop: Spacing.lg },
+            {
+              color: theme.text,
+              marginTop: "auto",
+              justifyContent: "flex-end",
+            },
           ]}
         >
           Quick Tools
@@ -336,7 +331,7 @@ export default function HomeScreen() {
               Share / Compile PDF
             </Text>
           </Pressable>
-        </View>
+        </View> */}
 
         <View style={{ height: 110 }} />
       </ScrollView>

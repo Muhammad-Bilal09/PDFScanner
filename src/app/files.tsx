@@ -27,10 +27,6 @@ import { Radius, Spacing, Typography } from "@/theme";
 const CATEGORIES = [
   "All Docs",
   "Favorites",
-  "Recent",
-  "Invoices",
-  "Personal",
-  "Business",
 ];
 
 export default function FilesScreen() {
@@ -122,18 +118,6 @@ export default function FilesScreen() {
   const filteredDocs = documents
     .filter((doc) => {
       if (selectedCategory === "Favorites") return doc.favorite === true;
-      if (selectedCategory === "Recent") {
-        return (
-          doc.date.includes("Today") ||
-          doc.date.includes("mins ago") ||
-          doc.date.includes("hour")
-        );
-      }
-      if (selectedCategory !== "All Docs") {
-        return doc.tags?.some(
-          (t) => t.toLowerCase() === selectedCategory.toLowerCase(),
-        );
-      }
       return true;
     })
     .filter((doc) => {
@@ -149,7 +133,12 @@ export default function FilesScreen() {
       if (sortOption === "name") {
         return a.name.localeCompare(b.name);
       }
-      return b.id.localeCompare(a.id);
+      const timeA = a.createdAt || (a.id.startsWith('doc_') ? parseInt(a.id.split('_')[1], 10) || 0 : 0);
+      const timeB = b.createdAt || (b.id.startsWith('doc_') ? parseInt(b.id.split('_')[1], 10) || 0 : 0);
+      if (timeA !== timeB) {
+        return timeB - timeA;
+      }
+      return documents.indexOf(a) - documents.indexOf(b);
     });
 
   return (

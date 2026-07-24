@@ -1,4 +1,3 @@
-import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -11,6 +10,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { pickPhotoWithPermissions } from "@/utils/photo-picker";
 import { BottomSheet } from "@/components/shared/BottomSheet";
 import { Icon } from "@/components/shared/Icon";
 import { TabBar } from "@/components/tabBar";
@@ -31,26 +31,16 @@ export default function ToolsScreen() {
   }, []);
 
   const handleImportGallery = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ["images"],
-        allowsEditing: false,
-        quality: 0.9,
+    const picked = await pickPhotoWithPermissions();
+    if (picked) {
+      router.push({
+        pathname: "/scan" as any,
+        params: {
+          importUri: picked.uri,
+          width: picked.width,
+          height: picked.height,
+        },
       });
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const asset = result.assets[0];
-        router.push({
-          pathname: "/scan" as any,
-          params: {
-            importUri: asset.uri,
-            width: asset.width || 800,
-            height: asset.height || 1000,
-          },
-        });
-      }
-    } catch (e) {
-      Alert.alert("Import Error", "Failed to load photo library.");
     }
   };
 

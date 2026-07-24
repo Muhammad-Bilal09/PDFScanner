@@ -6,6 +6,8 @@ import {
     readAsStringAsync,
     writeAsStringAsync,
 } from "expo-file-system/legacy";
+import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
+import { optimizeImageForScanning } from "@/utils/photo-picker";
 
 const documentDirectory = Paths.document.uri.endsWith("/")
   ? Paths.document.uri
@@ -193,13 +195,33 @@ export const ImageProcessor = {
    * @returns List of 4 normalized corner coordinates + image resolution.
    */
   async detectEdges(imageUri: string): Promise<EdgeDetectionResult> {
-    const base64 = await readAsStringAsync(imageUri, {
-      encoding: EncodingType.Base64,
-    });
-    const dataUrl = `data:image/jpeg;base64,${base64}`;
-    return sendTaskToWebView<EdgeDetectionResult>("DETECT_EDGES", {
-      imageBase64: dataUrl,
-    });
+    try {
+      const optimized = await optimizeImageForScanning(imageUri);
+      const base64 = await readAsStringAsync(optimized.uri, {
+        encoding: EncodingType.Base64,
+      });
+      const dataUrl = `data:image/jpeg;base64,${base64}`;
+      const result = await sendTaskToWebView<EdgeDetectionResult>("DETECT_EDGES", {
+        imageBase64: dataUrl,
+      });
+      return {
+        points: result.points,
+        width: result.width || optimized.width,
+        height: result.height || optimized.height,
+      };
+    } catch (e) {
+      console.warn("[Processor] detectEdges error fallback:", e);
+      return {
+        points: [
+          { x: 0.15, y: 0.15 },
+          { x: 0.85, y: 0.15 },
+          { x: 0.85, y: 0.85 },
+          { x: 0.15, y: 0.85 }
+        ],
+        width: 800,
+        height: 1000,
+      };
+    }
   },
 
   /**
@@ -212,7 +234,8 @@ export const ImageProcessor = {
     filter: string,
   ): Promise<string> {
     try {
-      const base64 = await readAsStringAsync(imageUri, {
+      const optimized = await optimizeImageForScanning(imageUri);
+      const base64 = await readAsStringAsync(optimized.uri, {
         encoding: EncodingType.Base64,
       });
       const dataUrl = `data:image/jpeg;base64,${base64}`;
@@ -237,11 +260,33 @@ export const ImageProcessor = {
       return newUri;
     } catch (e) {
       console.warn(
-        "[Processor] warpAndEnhance failed, falling back to original image:",
+        "[Processor] warpAndEnhance failed or timed out, executing native crop fallback:",
         e,
       );
-      // Fallback: return the original image URI so the document is still saved
-      return imageUri;
+      try {
+        const optimized = await optimizeImageForScanning(imageUri);
+        const xs = corners.map((p) => p.x);
+        const ys = corners.map((p) => p.y);
+        const minX = Math.max(0, Math.min(...xs));
+        const minY = Math.max(0, Math.min(...ys));
+        const maxX = Math.min(1, Math.max(...xs));
+        const maxY = Math.min(1, Math.max(...ys));
+
+        const originX = Math.round(minX * optimized.width);
+        const originY = Math.round(minY * optimized.height);
+        const cropW = Math.max(10, Math.round((maxX - minX) * optimized.width));
+        const cropH = Math.max(10, Math.round((maxY - minY) * optimized.height));
+
+        const cropped = await manipulateAsync(
+          optimized.uri,
+          [{ crop: { originX, originY, width: cropW, height: cropH } }],
+          { compress: 0.9, format: SaveFormat.JPEG }
+        );
+        return cropped.uri;
+      } catch (cropErr) {
+        console.error("[Processor] Native crop fallback error:", cropErr);
+        return imageUri;
+      }
     }
   },
 
@@ -259,7 +304,8 @@ export const ImageProcessor = {
     },
   ): Promise<string> {
     try {
-      const base64 = await readAsStringAsync(imageUri, {
+      const optimized = await optimizeImageForScanning(imageUri);
+      const base64 = await readAsStringAsync(optimized.uri, {
         encoding: EncodingType.Base64,
       });
       const dataUrl = `data:image/jpeg;base64,${base64}`;
@@ -591,13 +637,9 @@ export async function getProcessorHtml(): Promise<string> {
           img.onload = function() {
             try {
               if (typeof cv === 'undefined' || !cv.imread) {
-                const canvasOut = document.getElementById('canvasOutput');
-                const ctxOut = canvasOut.getContext('2d');
-                canvasOut.width = img.width;
-                canvasOut.height = img.height;
-                ctxOut.drawImage(img, 0, 0);
-                const resultBase64 = canvasOut.toDataURL('image/jpeg', 0.85);
-                sendResponse(taskId, 'WARPED_COMPLETED', { image: resultBase64 });
+                console.log('[Processor] OpenCV not available, using canvas fallback.');
+                const fallbackResult = warpPerspectiveCanvas(img, params.corners, params.filter);
+                sendResponse(taskId, 'WARPED_COMPLETED', { image: fallbackResult });
                 return;
               }
 

@@ -1,4 +1,5 @@
 import { Image } from "expo-image";
+import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -29,6 +30,7 @@ import { useDocuments } from "@/hooks/use-documents";
 import { useTheme } from "@/hooks/use-theme";
 import { ImageProcessor, Point } from "@/services/processor";
 import { Radius, Shadows, Spacing, Typography } from "@/theme";
+import { pickMultiplePhotosWithPermissions } from "@/utils/photo-picker";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 const GRID_ITEM_W = (SCREEN_W - 56) / 2;
@@ -337,10 +339,37 @@ export default function DocumentEditScreen() {
   // Handle page rotation
   const handleRotatePage = async (pageId: string) => {
     if (!document) return;
-    const updatedPages = document.pagesList.map((p) =>
-      p.id === pageId ? { ...p, rotation: (p.rotation + 90) % 360 } : p,
-    );
-    await updateDocument(document.id, { pagesList: updatedPages });
+    const targetPage = document.pagesList.find((p) => p.id === pageId);
+    if (!targetPage) return;
+
+    setProcessing(true);
+    try {
+      const rotated = await manipulateAsync(
+        targetPage.processedUri,
+        [{ rotate: 90 }],
+        { format: SaveFormat.JPEG, compress: 0.9 }
+      );
+
+      const updatedPages = document.pagesList.map((p) =>
+        p.id === pageId
+          ? {
+              ...p,
+              processedUri: rotated.uri,
+              rotation: 0,
+            }
+          : p,
+      );
+
+      await updateDocument(document.id, { pagesList: updatedPages });
+      setDocument({
+        ...document,
+        pagesList: updatedPages,
+      });
+    } catch (e) {
+      console.warn("Rotation error:", e);
+    } finally {
+      setProcessing(false);
+    }
   };
 
   // Duplicate a page
@@ -359,6 +388,11 @@ export default function DocumentEditScreen() {
       pages: updatedPages.length,
       pagesList: updatedPages,
     });
+    setDocument({
+      ...document,
+      pages: updatedPages.length,
+      pagesList: updatedPages,
+    });
   };
 
   // Rearrange order: Move Left (Up)
@@ -369,6 +403,7 @@ export default function DocumentEditScreen() {
     updatedPages[idx] = updatedPages[idx - 1];
     updatedPages[idx - 1] = temp;
     await updateDocument(document.id, { pagesList: updatedPages });
+    setDocument({ ...document, pagesList: updatedPages });
   };
 
   // Rearrange order: Move Right (Down)
@@ -379,33 +414,50 @@ export default function DocumentEditScreen() {
     updatedPages[idx] = updatedPages[idx + 1];
     updatedPages[idx + 1] = temp;
     await updateDocument(document.id, { pagesList: updatedPages });
+    setDocument({ ...document, pagesList: updatedPages });
   };
 
   // Open Re-Crop Flow for selected page
-  const handleStartReedit = (page: PageItemType) => {
+  const handleStartReedit = async (page: PageItemType) => {
     setActivePage(page);
-    setCropPoints(page.corners);
-    setActiveFilter(page.filter);
-    setActiveRotation(page.rotation);
+    setCropPoints(
+      page.corners && page.corners.length === 4
+        ? page.corners
+        : [
+            { x: 0.05, y: 0.05 },
+            { x: 0.95, y: 0.05 },
+            { x: 0.95, y: 0.95 },
+            { x: 0.05, y: 0.95 },
+          ],
+    );
+    setActiveFilter(page.filter || "magic");
+    setActiveRotation(page.rotation || 0);
     setBrightness(0);
     setContrast(0);
     setSaturation(0);
     setSharpness(0);
     setReviewTab("filter");
 
-    RNImage.getSize(
-      page.originalUri,
-      (w: number, h: number) => {
-        setImageWidth(w);
-        setImageHeight(h);
-        setEditorState("cropping");
-      },
-      () => {
-        setImageWidth(800);
-        setImageHeight(1000);
-        setEditorState("cropping");
-      },
-    );
+    try {
+      const info = await manipulateAsync(page.originalUri, [], {});
+      setImageWidth(info.width || 800);
+      setImageHeight(info.height || 1000);
+      setEditorState("cropping");
+    } catch (e) {
+      RNImage.getSize(
+        page.originalUri,
+        (w: number, h: number) => {
+          setImageWidth(w);
+          setImageHeight(h);
+          setEditorState("cropping");
+        },
+        () => {
+          setImageWidth(800);
+          setImageHeight(1000);
+          setEditorState("cropping");
+        },
+      );
+    }
   };
 
   // Warp perspective save handler
@@ -486,23 +538,43 @@ export default function DocumentEditScreen() {
     setProcessing(true);
 
     try {
+      let finalProcessedUri = warpedPreviewUri;
+      if (activeRotation !== 0) {
+        try {
+          const rotated = await manipulateAsync(
+            warpedPreviewUri,
+            [{ rotate: activeRotation }],
+            { format: SaveFormat.JPEG, compress: 0.9 },
+          );
+          finalProcessedUri = rotated.uri;
+        } catch (err) {
+          console.warn("[Editor] Failed to bake rotation:", err);
+        }
+      }
+
       const updatedPages = document.pagesList.map((p) =>
         p.id === activePage.id
           ? {
               ...p,
-              processedUri: warpedPreviewUri,
+              processedUri: finalProcessedUri,
               corners: cropPoints,
               filter: activeFilter,
-              rotation: activeRotation,
+              rotation: 0,
             }
           : p,
       );
 
       await updateDocument(document.id, { pagesList: updatedPages });
+      setDocument({
+        ...document,
+        pagesList: updatedPages,
+      });
+
       setEditorState("grid");
       setActivePage(null);
       setWarpedPreviewUri(null);
       setBaseWarpedUri(null);
+      setActiveRotation(0);
     } catch (e) {
       Alert.alert("Error", "Failed to save updates to page.");
     } finally {
@@ -520,13 +592,81 @@ export default function DocumentEditScreen() {
     }
   };
 
-  // Direct append new scans
+  // Direct append new scans or gallery photos
   const handleAddPages = () => {
     if (!document) return;
-    router.replace({
-      pathname: "/scan" as any,
-      params: { appendDocId: document.id },
-    });
+    Alert.alert(
+      "Add Pages",
+      "Choose how you want to add new pages to this document:",
+      [
+        {
+          text: "Scan with Camera",
+          onPress: () => {
+            router.push({
+              pathname: "/scan" as any,
+              params: { appendDocId: document.id },
+            });
+          },
+        },
+        {
+          text: "Import from Gallery",
+          onPress: async () => {
+            const pickedList = await pickMultiplePhotosWithPermissions();
+            if (pickedList && pickedList.length > 0) {
+              setProcessing(true);
+              try {
+                const newPages: PageItemType[] = [];
+                for (const item of pickedList) {
+                  const detectResult = await ImageProcessor.detectEdges(item.uri);
+                  const points =
+                    detectResult &&
+                    detectResult.points &&
+                    detectResult.points.length === 4
+                      ? detectResult.points
+                      : [
+                          { x: 0.05, y: 0.05 },
+                          { x: 0.95, y: 0.05 },
+                          { x: 0.95, y: 0.95 },
+                          { x: 0.05, y: 0.95 },
+                        ];
+
+                  const warpedPath = await ImageProcessor.warpAndEnhance(
+                    item.uri,
+                    points,
+                    "magic",
+                  );
+
+                  newPages.push({
+                    id: Math.random().toString(36).substring(2, 9),
+                    originalUri: item.uri,
+                    processedUri: warpedPath,
+                    corners: points,
+                    filter: "magic",
+                    rotation: 0,
+                  });
+                }
+
+                const updatedPages = [...document.pagesList, ...newPages];
+                await updateDocument(document.id, {
+                  pages: updatedPages.length,
+                  pagesList: updatedPages,
+                });
+                setDocument({
+                  ...document,
+                  pages: updatedPages.length,
+                  pagesList: updatedPages,
+                });
+              } catch (e) {
+                Alert.alert("Import Error", "Failed to import selected pages.");
+              } finally {
+                setProcessing(false);
+              }
+            }
+          },
+        },
+        { text: "Cancel", style: "cancel" },
+      ],
+    );
   };
 
   if (editorState === "cropping" && activePage) {

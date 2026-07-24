@@ -1,21 +1,26 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Image } from 'expo-image';
-import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Dimensions,
   LayoutChangeEvent,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import {
+  pickPhotoWithPermissions,
+  pickMultiplePhotosWithPermissions,
+  optimizeImageForScanning,
+} from '@/utils/photo-picker';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import Animated, {
-  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -72,6 +77,14 @@ export default function ScanScreen() {
   const theme = useTheme();
   const { documents, addDocument, updateDocument } = useDocuments();
   const [permission, requestPermission] = useCameraPermissions();
+  const [isCameraReady, setIsCameraReady] = useState(false);
+
+  // Request camera permission before opening the native document scanner.
+  useEffect(() => {
+    if (permission && !permission.granted && permission.canAskAgain) {
+      void requestPermission();
+    }
+  }, [permission, requestPermission]);
 
   // Screen layout size
   const [viewfinderSize, setViewfinderSize] = useState({ width: SCREEN_W, height: SCREEN_H - 240 });
@@ -98,10 +111,7 @@ export default function ScanScreen() {
   const [batchPages, setBatchPages] = useState<PageItemType[]>([]);
   const [batchReviewIndex, setBatchReviewIndex] = useState<number>(0);
 
-  // Auto-capture & detection feedback states
-  const [autoCaptureEnabled, setAutoCaptureEnabled] = useState(false);
   const [guidancePrompt, setGuidancePrompt] = useState('ALIGN DOCUMENT IN FRAME');
-  const [countdown, setCountdown] = useState<number | null>(null);
   const [isStable, setIsStable] = useState(false);
 
   // Background processing states
@@ -121,14 +131,12 @@ export default function ScanScreen() {
   const laserPosition = useSharedValue(0);
 
   const cameraRef = useRef<CameraView>(null);
-  const isDetectingRef = useRef(false);
-  const lastCornersRef = useRef<Point[]>([]);
-  const stableCountRef = useRef(0);
+  const nativeLaunchStartedRef = useRef(false);
 
-  // Handle imported gallery image route param
+  // Handle imported gallery image route param (single trigger)
   useEffect(() => {
     if (importUri) {
-      processCapturedImage(
+      void processCapturedImage(
         importUri,
         width ? Number(width) : 800,
         height ? Number(height) : 1000
@@ -136,16 +144,19 @@ export default function ScanScreen() {
     }
   }, [importUri]);
 
-  // Auto-trigger native scanner on mount if available
+  // Launch the retained native scanner only after camera permission is ready.
   useEffect(() => {
-    if (isNativeScannerAvailable && viewState === 'camera') {
-      // Delay slightly to prevent mounting glitches
-      const t = setTimeout(() => {
-        handleLaunchNativeScanner();
-      }, 500);
-      return () => clearTimeout(t);
+    if (
+      isNativeScannerAvailable &&
+      !importUri &&
+      viewState === 'camera' &&
+      permission?.granted &&
+      !nativeLaunchStartedRef.current
+    ) {
+      nativeLaunchStartedRef.current = true;
+      void handleLaunchNativeScanner();
     }
-  }, [viewState]);
+  }, [importUri, permission?.granted, viewState]);
 
   // Loop laser animation
   useEffect(() => {
@@ -161,130 +172,6 @@ export default function ScanScreen() {
     );
   }, [viewState]);
 
-  // Periodic border-search guide wiggle loop (simulates computer vision scanning)
-  useEffect(() => {
-    if (viewState !== 'camera' || autoCaptureEnabled || isNativeScannerAvailable) return;
-
-    const wiggleInterval = setInterval(() => {
-      const wiggle = () => (Math.random() - 0.5) * 0.015;
-      setLiveCorners([
-        { x: 0.15 + wiggle(), y: 0.25 + wiggle() },
-        { x: 0.85 + wiggle(), y: 0.25 + wiggle() },
-        { x: 0.85 + wiggle(), y: 0.75 + wiggle() },
-        { x: 0.15 + wiggle(), y: 0.75 + wiggle() },
-      ]);
-    }, 900);
-
-    return () => clearInterval(wiggleInterval);
-  }, [viewState, autoCaptureEnabled]);
-
-  // Background capture edge-detection snaps ONLY when auto-capture is toggled on
-  useEffect(() => {
-    let detectInterval: ReturnType<typeof setInterval> | null = null;
-
-    if (viewState === 'camera' && permission?.granted && autoCaptureEnabled && !isNativeScannerAvailable) {
-      setGuidancePrompt('SEARCHING FOR DOCUMENT...');
-      borderOpacity.value = withSpring(0.7);
-
-      detectInterval = setInterval(async () => {
-        if (isDetectingRef.current || !cameraRef.current || viewState !== 'camera') return;
-        isDetectingRef.current = true;
-
-        try {
-          const snapshot = await cameraRef.current.takePictureAsync({
-            quality: 0.1,
-          });
-
-          if (snapshot && snapshot.uri) {
-            const detectResult = await ImageProcessor.detectEdges(snapshot.uri);
-            if (detectResult && detectResult.points && detectResult.points.length === 4) {
-              const points = detectResult.points;
-              const isFallback = points.every(p => p.x === 0.15 || p.x === 0.85);
-
-              if (!isFallback) {
-                runOnJS(setLiveCorners)(points);
-                borderOpacity.value = withSpring(1.0);
-
-                if (lastCornersRef.current.length === 4) {
-                  let totalOffset = 0;
-                  for (let i = 0; i < 4; i++) {
-                    totalOffset += Math.hypot(
-                      points[i].x - lastCornersRef.current[i].x,
-                      points[i].y - lastCornersRef.current[i].y
-                    );
-                  }
-
-                  if (totalOffset < 0.05) {
-                    stableCountRef.current += 1;
-                    if (stableCountRef.current >= 2) {
-                      runOnJS(setIsStable)(true);
-                      runOnJS(setGuidancePrompt)('HOLD STEADY...');
-                      if (countdown === null) {
-                        runOnJS(setCountdown)(2);
-                      }
-                    }
-                  } else {
-                    stableCountRef.current = 0;
-                    runOnJS(setIsStable)(false);
-                    runOnJS(setGuidancePrompt)('SEARCHING FOR DOCUMENT...');
-                    if (countdown !== null) {
-                      runOnJS(setCountdown)(null);
-                    }
-                  }
-                }
-                lastCornersRef.current = points;
-              } else {
-                resetLiveBorder();
-              }
-            } else {
-              resetLiveBorder();
-            }
-          }
-        } catch (e) {
-          // No-op
-        } finally {
-          isDetectingRef.current = false;
-        }
-      }, 1200);
-    } else {
-      resetLiveBorder();
-    }
-
-    return () => {
-      if (detectInterval) clearInterval(detectInterval);
-    };
-  }, [viewState, permission, autoCaptureEnabled, countdown]);
-
-  // Gallery redirect import
-  useEffect(() => {
-    if (importUri) {
-      setTimeout(() => {
-        processCapturedImage(
-          importUri,
-          parseInt(width || '800', 10),
-          parseInt(height || '1000', 10)
-        );
-      }, 300);
-    }
-  }, [importUri]);
-
-  // Countdown timer handler
-  useEffect(() => {
-    if (countdown === null) return;
-    if (countdown === 0) {
-      setCountdown(null);
-      handleCapture();
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      setCountdown(countdown - 1);
-      setGuidancePrompt(`CAPTURING IN ${countdown - 1}...`);
-    }, 800);
-
-    return () => clearTimeout(timer);
-  }, [countdown]);
-
   function resetLiveBorder() {
     setLiveCorners([
       { x: 0.15, y: 0.25 },
@@ -294,7 +181,7 @@ export default function ScanScreen() {
     ]);
     borderOpacity.value = withSpring(0.4);
     setIsStable(false);
-    setGuidancePrompt(autoCaptureEnabled ? 'SEARCHING FOR DOCUMENT...' : 'ALIGN DOCUMENT IN FRAME');
+    setGuidancePrompt('ALIGN DOCUMENT IN FRAME');
   }
 
   // Compile points string for standard SVG
@@ -331,18 +218,22 @@ export default function ScanScreen() {
     setProcessing(true);
     setProcessingMessage('Launching scanner...');
     try {
-      const { scannedImages } = await DocumentScanner.scanDocument();
+      const { scannedImages } = await DocumentScanner.scanDocument({
+        scannerMode: 'base_with_filter',
+      });
 
       if (scannedImages && scannedImages.length > 0) {
-        setProcessingMessage('Processing scanned page...');
+        setProcessingMessage('Processing scanned pages...');
 
-        // Native scanner returns already cropped and enhanced document image paths
-        const pages: PageItemType[] = scannedImages.map((uri: any) => {
+        const pages: PageItemType[] = [];
+        for (const rawUri of scannedImages) {
           const pageId = Math.random().toString(36).substring(2, 9);
-          return {
+          // Optimize and ensure file is saved in local cache
+          const localPhoto = await optimizeImageForScanning(rawUri);
+          pages.push({
             id: pageId,
-            originalUri: uri,
-            processedUri: uri,
+            originalUri: localPhoto.uri,
+            processedUri: localPhoto.uri,
             corners: [
               { x: 0, y: 0 },
               { x: 1, y: 0 },
@@ -351,17 +242,16 @@ export default function ScanScreen() {
             ],
             filter: 'original',
             rotation: 0,
-          };
-        });
+          });
+        }
 
-        if (activeTab === 'single') {
+        if (pages.length > 0) {
           let docId = '';
-          const newPage = pages[0];
 
           if (appendDocId) {
             const existingDoc = documents.find((d) => d.id === appendDocId);
             if (existingDoc) {
-              const updatedPages = [...(existingDoc.pagesList || []), newPage];
+              const updatedPages = [...(existingDoc.pagesList || []), ...pages];
               await updateDocument(appendDocId, {
                 pages: updatedPages.length,
                 pagesList: updatedPages,
@@ -372,14 +262,12 @@ export default function ScanScreen() {
             const newDoc = await addDocument({
               name: `Scan_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}_${Math.floor(100 + Math.random() * 900)}.pdf`,
               size: 'Calculating...',
-              pages: 1,
-              pagesList: [newPage],
+              pages: pages.length,
+              pagesList: pages,
               thumbColor: '#E6F4F1',
             });
             docId = newDoc.id;
           }
-
-
 
           resetScanState();
           router.replace({
@@ -387,29 +275,20 @@ export default function ScanScreen() {
             params: { id: docId },
           });
         } else {
-          // Batch Mode
-          setBatchPages((prev) => [...prev, ...pages]);
-          if (pages.length > 0) {
-            const firstNewIndex = batchPages.length;
-            setBatchReviewIndex(firstNewIndex);
-            setCurrentOriginalUri(pages[0].originalUri);
-            setCurrentWarpedUri(pages[0].processedUri);
-            setCurrentCorners(pages[0].corners);
-            setCurrentFilter(pages[0].filter);
-            setCurrentRotation(pages[0].rotation);
-            setViewState('review');
-          }
+          router.replace('/home' as any);
         }
+      } else {
+        router.replace('/home' as any);
       }
     } catch (e) {
       console.warn('Native Scanner error', e);
-      Alert.alert('Scanner Error', 'Failed to launch native document scanner.');
+      router.replace('/home' as any);
     } finally {
       setProcessing(false);
     }
-  };
+  }
 
-  if (!permission && !isNativeScannerAvailable) {
+  if (!permission) {
     return (
       <View style={[styles.fallbackContainer, { backgroundColor: '#121212' }]}>
         <ActivityIndicator size="large" color={theme.primary} />
@@ -418,7 +297,8 @@ export default function ScanScreen() {
     );
   }
 
-  if (!permission?.granted && !isNativeScannerAvailable) {
+  if (!permission?.granted) {
+    const isPermanentlyDenied = permission && !permission.canAskAgain;
     return (
       <View style={[styles.fallbackContainer, { backgroundColor: '#121212' }]}>
         <SafeAreaView style={styles.permissionCard} edges={['top', 'bottom']}>
@@ -429,15 +309,39 @@ export default function ScanScreen() {
           <Text style={styles.permissionDescription}>
             DocScan Pro requires camera access to scan documents, crop background, and compile PDFs.
           </Text>
-          <PrimaryButton
-            label="Grant Permission"
-            onPress={requestPermission}
-            style={styles.permissionBtn}
-          />
+          {isPermanentlyDenied ? (
+            <PrimaryButton
+              label="Open Settings"
+              onPress={() => {
+                Linking.openSettings().catch(() => {
+                  Alert.alert('Error', 'Unable to open settings automatically.');
+                });
+              }}
+              style={styles.permissionBtn}
+            />
+          ) : (
+            <PrimaryButton
+              label="Grant Permission"
+              onPress={requestPermission}
+              style={styles.permissionBtn}
+            />
+          )}
           <Pressable onPress={() => router.replace('/home' as any)} style={styles.cancelBtn}>
             <Text style={styles.cancelBtnText}>Back to Dashboard</Text>
           </Pressable>
         </SafeAreaView>
+      </View>
+    );
+  }
+
+  // Full-screen loading indicator during image import & computer vision processing
+  if (processing) {
+    return (
+      <View style={[styles.fallbackContainer, { backgroundColor: '#121212' }]}>
+        <ActivityIndicator size="large" color={theme.primary} />
+        <Text style={[styles.fallbackText, { marginTop: 16 }]}>
+          {processingMessage || 'Importing and processing image...'}
+        </Text>
       </View>
     );
   }
@@ -497,23 +401,64 @@ export default function ScanScreen() {
     }
   }
 
-  // Gallery import selector
+  // Gallery import selector using unified photo picker (supports single or multiple photos)
   async function handleImportGallery() {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: false,
-        quality: 0.9,
-      });
+    const pickedList = await pickMultiplePhotosWithPermissions();
+    if (pickedList && pickedList.length > 0) {
+      setProcessing(true);
+      setProcessingMessage('Processing gallery photo(s)...');
 
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const asset = result.assets[0];
-        setProcessing(true);
-        setProcessingMessage('Aligning document...');
-        processCapturedImage(asset.uri, asset.width || 800, asset.height || 1000);
+      try {
+        if (pickedList.length === 1) {
+          const item = pickedList[0];
+          await processCapturedImage(item.uri, item.width, item.height);
+        } else {
+          // Multi-photo batch import
+          const importedPages: PageItemType[] = [];
+          for (const item of pickedList) {
+            const detectResult = await ImageProcessor.detectEdges(item.uri);
+            const points = (detectResult && detectResult.points && detectResult.points.length === 4)
+              ? detectResult.points
+              : [
+                { x: 0.15, y: 0.15 },
+                { x: 0.85, y: 0.15 },
+                { x: 0.85, y: 0.85 },
+                { x: 0.15, y: 0.85 }
+              ];
+            
+            const warpedPath = await ImageProcessor.warpAndEnhance(
+              item.uri,
+              points,
+              currentFilter
+            );
+
+            importedPages.push({
+              id: Math.random().toString(36).substring(2, 9),
+              originalUri: item.uri,
+              processedUri: warpedPath,
+              corners: points,
+              filter: currentFilter,
+              rotation: 0,
+            });
+          }
+
+          setBatchPages((prev) => [...prev, ...importedPages]);
+          if (importedPages.length > 0) {
+            const firstIdx = batchPages.length;
+            setBatchReviewIndex(firstIdx);
+            setCurrentOriginalUri(importedPages[0].originalUri);
+            setCurrentWarpedUri(importedPages[0].processedUri);
+            setCurrentCorners(importedPages[0].corners);
+            setCurrentFilter(importedPages[0].filter);
+            setCurrentRotation(0);
+            setViewState('review');
+          }
+        }
+      } catch (err) {
+        Alert.alert('Import Error', 'Failed to process imported images.');
+      } finally {
+        setProcessing(false);
       }
-    } catch (e) {
-      Alert.alert('Import Error', 'Failed to load image from photo library.');
     }
   }
 
@@ -618,14 +563,28 @@ export default function ScanScreen() {
     setProcessingMessage('Saving document...');
 
     try {
+      let finalWarpedUri = currentWarpedUri;
+      if (currentRotation !== 0) {
+        try {
+          const rotated = await manipulateAsync(
+            currentWarpedUri,
+            [{ rotate: currentRotation }],
+            { format: SaveFormat.JPEG, compress: 0.9 }
+          );
+          finalWarpedUri = rotated.uri;
+        } catch (e) {
+          console.warn('Failed to bake rotation into image:', e);
+        }
+      }
+
       const pageId = Math.random().toString(36).substring(2, 9);
       const newPage: PageItemType = {
         id: pageId,
         originalUri: currentOriginalUri,
-        processedUri: currentWarpedUri,
+        processedUri: finalWarpedUri,
         corners: currentCorners,
         filter: currentFilter,
-        rotation: currentRotation,
+        rotation: 0,
       };
 
       let docId = '';
@@ -650,10 +609,8 @@ export default function ScanScreen() {
         docId = newDoc.id;
       }
 
-
-
       resetScanState();
-      router.push({
+      router.replace({
         pathname: '/documentEdit' as any,
         params: { id: docId },
       });
@@ -748,12 +705,10 @@ export default function ScanScreen() {
         docId = newDoc.id;
       }
 
-
-
       setBatchPages([]);
       resetScanState();
 
-      router.push({
+      router.replace({
         pathname: '/documentEdit' as any,
         params: { id: docId },
       });
@@ -781,35 +736,11 @@ export default function ScanScreen() {
   // NATIVE SCANNER ACTIVE VIEW (Rendered if running in custom development client build)
   if (viewState === 'camera' && isNativeScannerAvailable) {
     return (
-      <View style={[styles.root, { backgroundColor: '#121212', alignItems: 'center', justifyContent: 'center' }]}>
-        <SafeAreaView style={styles.nativePromptCard}>
-          <View style={[styles.nativePromptIconCircle, { backgroundColor: theme.primaryLight }]}>
-            <Icon sf="camera.aperture" fallback="📷" size={32} color={theme.primary} />
-          </View>
-          <Text style={styles.nativePromptTitle}>Native Document Scanner</Text>
-          <Text style={styles.nativePromptDesc}>
-            Apple VisionKit / Google ML Kit scanner is active. Snapped images are automatically cropped, aligned, and optimized.
-          </Text>
-          <PrimaryButton
-            label="Open Document Camera"
-            onPress={handleLaunchNativeScanner}
-            style={styles.nativePromptBtn}
-          />
-          <OutlineButton
-            label="Back to Dashboard"
-            onPress={() => router.replace('/home' as any)}
-            style={styles.nativePromptBtn}
-          />
-        </SafeAreaView>
-
-        {processing && (
-          <View style={styles.loadingContainer}>
-            <View style={styles.loadingCard}>
-              <ActivityIndicator size="large" color={theme.primary} />
-              <Text style={styles.loadingText}>{processingMessage}</Text>
-            </View>
-          </View>
-        )}
+      <View style={[styles.fallbackContainer, { backgroundColor: '#121212' }]}>
+        <ActivityIndicator size="large" color={theme.primary} />
+        <Text style={[styles.fallbackText, { marginTop: 16 }]}>
+          {processingMessage || 'Launching scanner...'}
+        </Text>
       </View>
     );
   }
@@ -826,7 +757,16 @@ export default function ScanScreen() {
           enableTorch={flash === 'on'}
           zoom={zoom}
           ref={cameraRef}
+          onCameraReady={() => setIsCameraReady(true)}
         />
+
+        {/* Loading overlay while camera hardware warms up */}
+        {!isCameraReady && (
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: '#121212', alignItems: 'center', justifyContent: 'center', zIndex: 10 }]}>
+            <ActivityIndicator size="large" color={theme.primary} />
+            <Text style={[styles.fallbackText, { marginTop: 12 }]}>Preparing camera...</Text>
+          </View>
+        )}
 
         {/* Live boundary guidelines layer */}
         <View style={styles.viewfinderBg} onLayout={handleLayout} pointerEvents="none">
@@ -850,13 +790,6 @@ export default function ScanScreen() {
               animatedLaserStyle,
             ]}
           />
-
-          {/* Countdown indicator */}
-          {countdown !== null && (
-            <View style={styles.countdownOverlay}>
-              <Text style={[styles.countdownText, { color: theme.primary }]}>{countdown}</Text>
-            </View>
-          )}
 
           {/* Real-time status text badge */}
           <View style={styles.statusBadgeContainer}>
@@ -923,19 +856,6 @@ export default function ScanScreen() {
                 <Text style={[styles.zoomText, { color: zoom > 0 ? '#121212' : '#FFFFFF' }]}>
                   {zoom > 0 ? '2x' : '1x'}
                 </Text>
-              </Pressable>
-
-              {/* Auto Capture toggle */}
-              <Pressable
-                style={[styles.iconBtn, autoCaptureEnabled && { backgroundColor: theme.primary, borderColor: theme.primary }]}
-                onPress={() => setAutoCaptureEnabled(!autoCaptureEnabled)}
-              >
-                <Icon
-                  sf={autoCaptureEnabled ? 'play.circle.fill' : 'hand.tap.fill'}
-                  fallback="Auto"
-                  size={16}
-                  color={autoCaptureEnabled ? '#121212' : '#FFFFFF'}
-                />
               </Pressable>
 
               {/* Capsule Switch Single/Batch */}
@@ -1671,53 +1591,5 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: Typography.sizes.sm,
     fontWeight: '700',
-  },
-  countdownOverlay: {
-    ...StyleSheet.absoluteFill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.15)',
-    zIndex: 99,
-  },
-  countdownText: {
-    fontSize: 108,
-    fontWeight: '900',
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 4,
-  },
-
-  /* Native scanner prompt */
-  nativePromptCard: {
-    paddingHorizontal: Spacing.xl,
-    alignItems: 'center',
-    gap: Spacing.md,
-    width: '100%',
-  },
-  nativePromptIconCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.sm,
-  },
-  nativePromptTitle: {
-    fontSize: Typography.sizes.md + 2,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    textAlign: 'center',
-  },
-  nativePromptDesc: {
-    fontSize: Typography.sizes.xs + 0.5,
-    color: '#A0A0A0',
-    textAlign: 'center',
-    lineHeight: 18,
-    paddingHorizontal: Spacing.md,
-    marginBottom: Spacing.md,
-  },
-  nativePromptBtn: {
-    width: '85%',
-    marginTop: Spacing.xs,
   },
 });
