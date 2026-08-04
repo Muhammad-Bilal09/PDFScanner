@@ -4,14 +4,9 @@ import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Icon } from "@/components/shared/Icon";
-import { useTheme } from "@/hooks/use-theme";
+import { useTheme } from "@/hooks/useTheme";
 import { Radius, Shadows, Spacing } from "@/theme";
-
-export type ActiveTab = "home" | "files" | "tools" | "settings" | "scan";
-
-interface TabBarProps {
-  activeTab: ActiveTab;
-}
+import { TabBarProps } from "@/types/types";
 
 function TabItem({
   label,
@@ -203,11 +198,9 @@ const styles = StyleSheet.create({
     borderRadius: Radius.full,
     marginTop: 1,
   },
-  // Floating Scan FAB
   floatingFabSlot: {
     position: "absolute",
     right: 30,
-    // left: 30,
     bottom: 120,
     zIndex: 9999,
   },

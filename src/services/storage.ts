@@ -1,30 +1,33 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { DocumentItemType } from '@/components/shared/DocumentCard';
+import { AppSettings, DocumentItemType } from '../types/types';
 
-const ONBOARDING_KEY = '@pdfscanner_onboarding';
-const DOCUMENTS_KEY = '@pdfscanner_documents';
-const SETTINGS_KEY = '@pdfscanner_settings';
-
-export interface AppSettings {
-  autoSync: boolean;
-  wifiOnly: boolean;
-  darkMode: boolean;
-}
+const ONBOARDING_KEY = '@scanly_onboarding';
+const DOCUMENTS_KEY = '@scanly_documents';
+const SETTINGS_KEY = '@scanly_settings';
+const OLD_ONBOARDING_KEY = '@pdfscanner_onboarding';
+const OLD_DOCUMENTS_KEY = '@pdfscanner_documents';
+const OLD_SETTINGS_KEY = '@pdfscanner_settings';
 
 const DEFAULT_SETTINGS: AppSettings = {
-  autoSync: true,
-  wifiOnly: true,
-  darkMode: false,
+  autoCrop: true,
+  defaultFilter: 'magic',
+  pdfQuality: 'high',
+  saveToGallery: false,
+  cloudSyncEnabled: true,
+  darkTheme: false,
+  ocrLanguage: 'en',
+  watermarkText: 'Scanly',
 };
 
-// Initial sample documents
 const SAMPLE_DOCUMENTS: DocumentItemType[] = [];
 
 export const LocalStorage = {
-  // Onboarding
   async getOnboardingStatus(): Promise<boolean> {
     try {
-      const val = await AsyncStorage.getItem(ONBOARDING_KEY);
+      let val = await AsyncStorage.getItem(ONBOARDING_KEY);
+      if (val === null) {
+        val = await AsyncStorage.getItem(OLD_ONBOARDING_KEY);
+      }
       return val === 'true';
     } catch {
       return false;
@@ -39,10 +42,12 @@ export const LocalStorage = {
     }
   },
 
-  // Settings
   async getSettings(): Promise<AppSettings> {
     try {
-      const val = await AsyncStorage.getItem(SETTINGS_KEY);
+      let val = await AsyncStorage.getItem(SETTINGS_KEY);
+      if (!val) {
+        val = await AsyncStorage.getItem(OLD_SETTINGS_KEY);
+      }
       return val ? JSON.parse(val) : DEFAULT_SETTINGS;
     } catch {
       return DEFAULT_SETTINGS;
@@ -57,10 +62,12 @@ export const LocalStorage = {
     }
   },
 
-  // Documents
   async getDocuments(): Promise<DocumentItemType[]> {
     try {
-      const val = await AsyncStorage.getItem(DOCUMENTS_KEY);
+      let val = await AsyncStorage.getItem(DOCUMENTS_KEY);
+      if (!val) {
+        val = await AsyncStorage.getItem(OLD_DOCUMENTS_KEY);
+      }
       if (!val) {
         return [];
       }
@@ -83,22 +90,14 @@ export const LocalStorage = {
     }
   },
 
-  async addDocument(doc: Omit<DocumentItemType, 'id' | 'date'>): Promise<DocumentItemType> {
+  async addDocument(doc: any): Promise<DocumentItemType> {
     const docs = await this.getDocuments();
     const now = Date.now();
     const newDoc: DocumentItemType = {
       ...doc,
-      id: `doc_${now}_${Math.random().toString(36).substring(2, 6)}`,
-      createdAt: now,
-      date: new Date().toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-      }) + ', ' + new Date().toLocaleTimeString('en-US', {
-        hour: 'numeric',
-        minute: '2-digit',
-      }),
-      favorite: doc.favorite ?? false,
+      id: doc.id || `doc_${now}_${Math.random().toString(36).substring(2, 6)}`,
+      createdAt: doc.createdAt || now,
+      updatedAt: doc.updatedAt || now,
       tags: doc.tags ?? [],
     };
     docs.unshift(newDoc);
@@ -114,27 +113,27 @@ export const LocalStorage = {
 
   async renameDocument(id: string, newName: string): Promise<void> {
     const docs = await this.getDocuments();
-    const updated = docs.map((d) => (d.id === id ? { ...d, name: newName } : d));
+    const updated = docs.map((d) => (d.id === id ? { ...d, title: newName, updatedAt: Date.now() } : d));
     await this.saveDocuments(updated);
   },
 
   async updateDocument(id: string, updatedFields: Partial<DocumentItemType>): Promise<void> {
     const docs = await this.getDocuments();
-    const updated = docs.map((d) => (d.id === id ? { ...d, ...updatedFields } : d));
+    const updated = docs.map((d) => (d.id === id ? { ...d, ...updatedFields, updatedAt: Date.now() } : d));
     await this.saveDocuments(updated);
   },
 
   async toggleFavorite(id: string): Promise<boolean> {
     const docs = await this.getDocuments();
-    let currentFavorite = false;
+    let currentFav = false;
     const updated = docs.map((d) => {
       if (d.id === id) {
-        currentFavorite = !d.favorite;
-        return { ...d, favorite: currentFavorite };
+        currentFav = !d.favorite;
+        return { ...d, favorite: currentFav, updatedAt: Date.now() };
       }
       return d;
     });
     await this.saveDocuments(updated);
-    return currentFavorite;
+    return currentFav;
   },
 };

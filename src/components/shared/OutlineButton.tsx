@@ -11,20 +11,10 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/hooks/useTheme';
 import { Spacing, Radius, Typography } from '@/theme';
 import { Icon } from './Icon';
-
-interface OutlineButtonProps {
-  label: string;
-  onPress: () => void;
-  loading?: boolean;
-  disabled?: boolean;
-  icon?: string;
-  iconFallback?: string;
-  style?: ViewStyle;
-  textStyle?: TextStyle;
-}
+import { OutlineButtonProps } from '@/types/types';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 

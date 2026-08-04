@@ -1,28 +1,29 @@
-import React, { useState, useRef, useMemo } from 'react';
+import { useTheme } from '@/hooks/useTheme';
+import { Radius, Shadows, Spacing, Typography } from '@/theme';
+import { Point } from '@/types/types';
+import { useMemo, useRef, useState } from 'react';
 import {
-  StyleSheet,
-  View,
-  Text,
   Dimensions,
   Image,
   PanResponder,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
-import Svg, { Polygon, Line } from 'react-native-svg';
-import { Point } from '@/services/processor';
-import { useTheme } from '@/hooks/use-theme';
-import { Spacing, Radius, Typography, Shadows } from '@/theme';
+import Svg, { Line, Polygon } from 'react-native-svg';
 import { OutlineButton } from './OutlineButton';
 import { PrimaryButton } from './PrimaryButton';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
-interface DocumentCropViewProps {
+export interface DocumentCropViewProps {
   imageUri: string;
   imageWidth: number;
   imageHeight: number;
-  initialPoints: Point[];
-  onCancel: () => void;
-  onSave: (points: Point[]) => void;
+  initialPoints?: Point[];
+  onCropChange?: (points: Point[]) => void;
+  onCancel?: () => void;
+  onSave?: (points: Point[]) => void;
 }
 
 const DEFAULT_POINTS: Point[] = [
@@ -37,12 +38,12 @@ export function DocumentCropView({
   imageWidth,
   imageHeight,
   initialPoints,
+  onCropChange,
   onCancel,
   onSave,
 }: DocumentCropViewProps) {
   const theme = useTheme();
 
-  // Corner state (array of 4 normalized points: TL, TR, BR, BL)
   const [points, setPoints] = useState<Point[]>(() => {
     if (Array.isArray(initialPoints) && initialPoints.length === 4) {
       return initialPoints;
@@ -53,19 +54,16 @@ export function DocumentCropView({
   const pointsRef = useRef<Point[]>(points);
   pointsRef.current = points;
 
-  // Track layout dimensions of the image canvas container
   const [containerSize, setContainerSize] = useState<{ width: number; height: number } | null>(null);
   const containerRef = useRef<View>(null);
   const containerPagePos = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
-  // Drag states for magnifying glass
   const [activeCorner, setActiveCorner] = useState<number>(-1);
   const activeCornerRef = useRef<number>(-1);
   activeCornerRef.current = activeCorner;
 
   const [dragPosition, setDragPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
-  // Calculate image fit dimensions and offsets inside the container
   const layout = useMemo(() => {
     if (!containerSize || !imageWidth || !imageHeight) return null;
 
@@ -81,12 +79,10 @@ export function DocumentCropView({
     let offsetY = 0;
 
     if (ratioImg > ratioWin) {
-      // Image is wider than container aspect ratio
       fitW = winW;
       fitH = winW / ratioImg;
       offsetY = (winH - fitH) / 2;
     } else {
-      // Image is taller than container aspect ratio
       fitH = winH;
       fitW = winH * ratioImg;
       offsetX = (winW - fitW) / 2;
@@ -98,7 +94,6 @@ export function DocumentCropView({
   const layoutRef = useRef(layout);
   layoutRef.current = layout;
 
-  // Convert page screen coordinates to container relative coordinates
   const getContainerRelativeCoords = (pageX: number, pageY: number) => {
     const pos = containerPagePos.current;
     return {
@@ -107,7 +102,6 @@ export function DocumentCropView({
     };
   };
 
-  // Map normalized coordinate to screen coordinates relative to container
   const getScreenCoords = (p: Point) => {
     if (!layout) return { x: 0, y: 0 };
     return {
@@ -116,7 +110,6 @@ export function DocumentCropView({
     };
   };
 
-  // Convert container-relative screen coordinates back to normalized (0 - 1) image coordinates
   const getNormalizedCoords = (x: number, y: number) => {
     const l = layoutRef.current;
     if (!l) return { x: 0, y: 0 };
@@ -125,15 +118,14 @@ export function DocumentCropView({
     return { x: nX, y: nY };
   };
 
-  // Determine closest corner to the touch start
   const handleTouchStart = (pageX: number, pageY: number) => {
     const l = layoutRef.current;
     if (!l) return;
 
     const rel = getContainerRelativeCoords(pageX, pageY);
-    
+
     let closestIndex = -1;
-    let minDistance = 70; // max touch radius in px
+    let minDistance = 70;
 
     pointsRef.current.forEach((p, idx) => {
       const s = {
@@ -154,7 +146,6 @@ export function DocumentCropView({
     }
   };
 
-  // Drag responder
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -166,7 +157,7 @@ export function DocumentCropView({
       onPanResponderMove: (evt) => {
         const curActive = activeCornerRef.current;
         if (curActive === -1 || !layoutRef.current) return;
-        
+
         const { pageX, pageY } = evt.nativeEvent;
         const rel = getContainerRelativeCoords(pageX, pageY);
 
@@ -188,12 +179,10 @@ export function DocumentCropView({
     })
   ).current;
 
-  // Position of handles for screen rendering
   const screenPoints = useMemo(() => {
     return points.map((p) => getScreenCoords(p));
   }, [points, layout]);
 
-  // Render SVG connection lines connecting points: 0->1->2->3->0
   const polyPointsString = useMemo(() => {
     if (!layout) return '';
     return screenPoints
@@ -201,17 +190,15 @@ export function DocumentCropView({
       .join(' ');
   }, [screenPoints, layout]);
 
-  // Magnifier layout details
   const magnifierOffset = useMemo(() => {
     if (activeCorner === -1 || !layout) return null;
     const corner = points[activeCorner];
-    
-    // Size of magnifier is 120x120, zoom is 2.5x
+
     const zoom = 2.5;
     const magSize = 120;
-    
+
     const s = getScreenCoords(corner);
-    
+
     const imgLeft = magSize / 2 - (s.x - layout.offsetX) * zoom;
     const imgTop = magSize / 2 - (s.y - layout.offsetY) * zoom;
 
@@ -230,13 +217,11 @@ export function DocumentCropView({
 
   return (
     <View style={[styles.root, { backgroundColor: '#121212' }]}>
-      {/* Title Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Adjust Boundaries</Text>
         <Text style={styles.subtitle}>Drag corners to align perfectly with the paper edges</Text>
       </View>
 
-      {/* Main Canvas Viewport */}
       <View
         ref={containerRef}
         style={styles.canvasContainer}
@@ -253,7 +238,6 @@ export function DocumentCropView({
       >
         {layout && containerSize && (
           <View style={styles.innerCanvas} pointerEvents="box-none">
-            {/* Base Image */}
             <View
               pointerEvents="none"
               style={[
@@ -273,16 +257,13 @@ export function DocumentCropView({
               />
             </View>
 
-            {/* Svg Quad Border Overlay */}
             <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
-              {/* Highlight area */}
               <Polygon
                 points={polyPointsString}
                 fill="rgba(0, 191, 165, 0.25)"
                 stroke={theme.primary}
                 strokeWidth="2.5"
               />
-              {/* Corner helper lines */}
               <Line
                 x1={screenPoints[0].x}
                 y1={screenPoints[0].y}
@@ -303,7 +284,6 @@ export function DocumentCropView({
               />
             </Svg>
 
-            {/* Draggable Circle Corner Knobs */}
             {screenPoints.map((pt, idx) => (
               <View
                 key={idx}
@@ -321,7 +301,6 @@ export function DocumentCropView({
               </View>
             ))}
 
-            {/* Magnifying Glass Zoom Lens */}
             {magnifierOffset && (
               <View
                 style={[
@@ -346,7 +325,6 @@ export function DocumentCropView({
                   }}
                   resizeMode="stretch"
                 />
-                {/* Crosshair target in magnifier */}
                 <View style={[styles.crosshairVertical, { backgroundColor: theme.primary }]} />
                 <View style={[styles.crosshairHorizontal, { backgroundColor: theme.primary }]} />
               </View>
@@ -355,19 +333,24 @@ export function DocumentCropView({
         )}
       </View>
 
-      {/* Button Row CTA */}
-      <View style={styles.footer}>
-        <OutlineButton
-          label="Cancel"
-          onPress={onCancel}
-          style={styles.btn}
-        />
-        <PrimaryButton
-          label="Apply Crop"
-          onPress={() => onSave(points)}
-          style={styles.btn}
-        />
-      </View>
+      {(onCancel || onSave) && (
+        <View style={styles.footer}>
+          {onCancel && (
+            <OutlineButton
+              label="Cancel"
+              onPress={onCancel}
+              style={styles.btn}
+            />
+          )}
+          {onSave && (
+            <PrimaryButton
+              label="Apply Crop"
+              onPress={() => onSave(points)}
+              style={styles.btn}
+            />
+          )}
+        </View>
+      )}
     </View>
   );
 }

@@ -1,28 +1,20 @@
 import { StyleSheet, Text, View, ViewStyle } from 'react-native';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/hooks/useTheme';
 import { Spacing, Typography, Radius } from '@/theme';
 import { Icon } from './Icon';
 import { PrimaryButton } from './PrimaryButton';
-
-interface EmptyViewProps {
-  icon: string;
-  fallback: string;
-  title: string;
-  description: string;
-  actionLabel?: string;
-  onActionPress?: () => void;
-  style?: ViewStyle;
-}
+import { EmptyViewProps } from '@/types/types';
 
 export function EmptyView({
-  icon,
-  fallback,
+  icon = 'folder',
+  fallback = '📁',
   title,
   description,
   actionLabel,
   onActionPress,
+  onAction,
   style,
-}: EmptyViewProps) {
+}: EmptyViewProps & { fallback?: string; onActionPress?: () => void; style?: ViewStyle }) {
   const theme = useTheme();
 
   return (

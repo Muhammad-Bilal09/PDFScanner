@@ -2,23 +2,11 @@ import * as Print from 'expo-print';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { Paths } from 'expo-file-system';
 import { moveAsync, getInfoAsync, readAsStringAsync, EncodingType } from 'expo-file-system/legacy';
-import { PageItemType } from '@/components/shared/DocumentCard';
+import { PageItemType, PaperSize, CompressionQuality, PdfGenerationOptions } from '../types/types';
 
 const cacheDirectory = Paths.cache.uri.endsWith('/') ? Paths.cache.uri : Paths.cache.uri + '/';
 
-export type PaperSize = 'A4' | 'Letter' | 'Legal';
-export type CompressionQuality = 'original' | 'high' | 'medium' | 'low';
-
-export interface PdfGenerationOptions {
-  paperSize?: PaperSize;
-  quality?: CompressionQuality;
-  removeWatermark?: boolean;
-}
-
 export const PdfService = {
-  /**
-   * Compress a single page image based on selected quality constraints.
-   */
   async compressPage(imageUri: string, quality: CompressionQuality): Promise<string> {
     if (quality === 'original') return imageUri;
 
@@ -53,10 +41,6 @@ export const PdfService = {
     }
   },
 
-  /**
-   * Generates a high-quality PDF from a list of page objects.
-   * @returns Local URI to the compiled PDF file.
-   */
   async generatePdf(
     documentName: string,
     pagesList: PageItemType[],
@@ -65,24 +49,27 @@ export const PdfService = {
     const {
       paperSize = 'A4',
       quality = 'high',
-      removeWatermark = true,
+      addWatermark = true,
+      removeWatermark = false,
+      watermarkText = 'Scanly',
     } = options;
+
+    const shouldWatermark = removeWatermark === true ? false : addWatermark;
 
     if (pagesList.length === 0) {
       throw new Error('Cannot generate PDF for an empty document.');
     }
 
-    // Step 1: Compress, optimize, and convert page images to Base64
     const pageDataUris: string[] = [];
     for (let i = 0; i < pagesList.length; i++) {
       const page = pagesList[i];
-      // Apply rotation if needed
-      let processedUri = page.processedUri;
-      if (page.rotation !== 0) {
+      let processedUri = page.croppedUri || page.originalUri;
+      const pageRotation = page.rotation || 0;
+      if (pageRotation !== 0) {
         try {
           const manipResult = await ImageManipulator.manipulateAsync(
-            page.processedUri,
-            [{ rotate: page.rotation }],
+            processedUri,
+            [{ rotate: pageRotation }],
             { format: ImageManipulator.SaveFormat.JPEG }
           );
           processedUri = manipResult.uri;
@@ -101,10 +88,34 @@ export const PdfService = {
       }
     }
 
-    // Step 2: Build HTML structure with base64 images
-    const watermarkHtml = removeWatermark
-      ? ''
-      : '<div style="position: absolute; bottom: 12px; right: 12px; font-size: 11px; color: rgba(0,0,0,0.35); font-family: system-ui, sans-serif; font-weight: 600; letter-spacing: 0.5px;">Scanned by DocScan Pro</div>';
+    const watermarkHtml = shouldWatermark
+      ? `
+        <div class="watermark-overlay">
+          <div class="watermark-content">
+            <svg width="44" height="44" viewBox="0 0 100 100" fill="none">
+              <rect width="100" height="100" rx="28" fill="#DC2626"/>
+              <path d="M 28 38 V 28 H 38" stroke="white" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M 72 38 V 28 H 62" stroke="white" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M 28 62 V 72 H 38" stroke="white" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M 72 62 V 72 H 62" stroke="white" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M 34 32 H 55 L 66 43 V 68 H 34 Z" fill="white"/>
+            </svg>
+            <span>${watermarkText}</span>
+          </div>
+        </div>
+        <div class="watermark-badge">
+          <svg width="18" height="18" viewBox="0 0 100 100" fill="none">
+            <rect width="100" height="100" rx="24" fill="#DC2626"/>
+            <path d="M 28 38 V 28 H 38" stroke="white" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M 72 38 V 28 H 62" stroke="white" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M 28 62 V 72 H 38" stroke="white" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M 72 62 V 72 H 62" stroke="white" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M 34 32 H 55 L 66 43 V 68 H 34 Z" fill="white"/>
+          </svg>
+          <span>Scanned with <strong>${watermarkText}</strong></span>
+        </div>
+      `
+      : '';
 
     const pagesHtml = pageDataUris
       .map((dataUri) => `
@@ -147,6 +158,48 @@ export const PdfService = {
             max-height: 100%;
             object-fit: contain;
           }
+          .watermark-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-30deg);
+            opacity: 0.12;
+            pointer-events: none;
+            z-index: 10;
+          }
+          .watermark-content {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+          }
+          .watermark-content span {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            font-size: 38px;
+            font-weight: 800;
+            color: #DC2626;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+          }
+          .watermark-badge {
+            position: absolute;
+            bottom: 24px;
+            right: 24px;
+            background: rgba(220, 38, 38, 0.92);
+            color: #FFFFFF;
+            padding: 6px 14px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            font-size: 13px;
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+            z-index: 10;
+          }
+          .watermark-badge strong {
+            font-weight: 800;
+          }
         </style>
       </head>
       <body>
@@ -155,10 +208,8 @@ export const PdfService = {
       </html>
     `;
 
-    // Step 3: Print HTML template to PDF file
     const pdfFile = await Print.printToFileAsync({ html: htmlContent });
 
-    // Step 4: Rename/move file to match document name
     const cleanName = documentName.replace(/\.[^/.]+$/, "").replace(/[^a-zA-Z0-9_-]/g, "_") + '.pdf';
     const finalPdfUri = cacheDirectory + cleanName;
 
@@ -170,9 +221,6 @@ export const PdfService = {
     return finalPdfUri;
   },
 
-  /**
-   * Helper to format a file size into readable string
-   */
   async getFormattedFileSize(fileUri: string): Promise<string> {
     try {
       const info = await getInfoAsync(fileUri);

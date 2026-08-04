@@ -1,7 +1,7 @@
 import { Icon } from "@/components/shared/Icon";
 import { LoadingView } from "@/components/shared/LoadingView";
-import { useOnboarding } from "@/hooks/use-onboarding";
-import { useTheme } from "@/hooks/use-theme";
+import { useOnboarding } from "@/hooks/useOnboarding";
+import { useTheme } from "@/hooks/useTheme";
 import { Radius, Shadows, Spacing, Typography } from "@/theme";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
@@ -44,8 +44,17 @@ export default function OnboardingScreen() {
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
       <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
-        {/* Header - Skip Button */}
         <View style={styles.header}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Image
+              source={require('@/assets/images/expo-logo.png')}
+              style={{ width: 32, height: 32, borderRadius: 8 }}
+              contentFit="contain"
+            />
+            <Text style={{ fontSize: 18, fontWeight: '900', color: theme.text }}>
+              Scanly
+            </Text>
+          </View>
           {activeSlide < 2 ? (
             <Pressable onPress={handleSkip} hitSlop={12} style={styles.skipBtn}>
               <Text style={[styles.skipText, { color: theme.primary }]}>
@@ -57,7 +66,6 @@ export default function OnboardingScreen() {
           )}
         </View>
 
-        {/* Carousel Content */}
         <View style={styles.carouselContainer}>
           {activeSlide === 0 && (
             <View style={styles.slide}>
@@ -91,7 +99,7 @@ export default function OnboardingScreen() {
               <Text
                 style={[styles.description, { color: theme.textSecondary }]}
               >
-                \ Capture, enhance, and organize your documents with fast,
+                Capture, enhance, and organize your documents with fast,
                 offline-ready scanning. Search within your PDF contents
                 instantly.
               </Text>
@@ -142,9 +150,7 @@ export default function OnboardingScreen() {
           )}
         </View>
 
-        {/* Footer Area */}
         <View style={styles.footer}>
-          {/* Slide Indicators */}
           <View style={styles.indicatorContainer}>
             <View style={styles.indicatorRow}>
               {[0, 1, 2].map((idx) => {
@@ -174,7 +180,6 @@ export default function OnboardingScreen() {
             )}
           </View>
 
-          {/* Action Button */}
           <Pressable
             style={[
               styles.actionBtn,
@@ -189,7 +194,6 @@ export default function OnboardingScreen() {
             <Icon sf="arrow.right" fallback="→" size={16} color="#FFFFFF" />
           </Pressable>
 
-          {/* Bottom Card for slide 3 */}
           {activeSlide === 2 ? (
             <View
               style={[
@@ -245,7 +249,7 @@ const styles = StyleSheet.create({
   header: {
     height: 48,
     flexDirection: "row",
-    justifyContent: "flex-end",
+    justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: Spacing.lg,
   },

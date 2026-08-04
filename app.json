@@ -1,35 +1,37 @@
 {
   "expo": {
-    "name": "PDFScanner",
-    "slug": "PDFScanner",
+    "name": "Scanly",
+    "slug": "scanly",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "pdfscanner",
+    "icon": "./assets/images/expo-logo.png",
+    "scheme": "scanly",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/images/expo-logo.png"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#DC2626",
+        "foregroundImage": "./assets/images/expo-logo.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.medialinks.PDFScanner"
+      "package": "com.medialinks.scanly",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/expo-logo.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#DC2626",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
@@ -38,20 +40,14 @@
       [
         "react-native-document-scanner-plugin",
         {
-          "cameraPermissionText": "DocScan Pro needs camera access to scan documents."
+          "cameraPermissionText": "Scanly needs camera access to scan documents."
         }
       ],
       "expo-image",
       [
-        "expo-camera",
-        {
-          "cameraPermission": "DocScan Pro requires camera access to scan documents."
-        }
-      ],
-      [
         "expo-image-picker",
         {
-          "photosPermission": "DocScan Pro requires photo library access to import document images."
+          "photosPermission": "Scanly requires photo library access to import document images."
         }
       ],
       "expo-status-bar",
@@ -64,7 +60,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "5047cc12-3e9b-4bad-b5f0-4c44f1206c10"
+        "projectId": "7a586808-91b0-4993-882a-5e4f07b51f70"
       }
     }
   }

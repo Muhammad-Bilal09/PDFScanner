@@ -1,28 +1,20 @@
+import { useTheme } from '@/hooks/useTheme';
+import { Radius, Spacing, Typography } from '@/theme';
+import { BottomSheetProps } from '@/types/types';
 import { useEffect } from 'react';
 import {
   Modal,
   Pressable,
   StyleSheet,
   Text,
-  View,
-  ViewStyle,
+  View
 } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import { useTheme } from '@/hooks/use-theme';
-import { Spacing, Radius, Typography } from '@/theme';
 import { Icon } from './Icon';
-
-interface BottomSheetProps {
-  visible: boolean;
-  onClose: () => void;
-  title?: string;
-  children: React.ReactNode;
-  style?: ViewStyle;
-}
 
 export function BottomSheet({
   visible,
@@ -85,7 +77,6 @@ export function BottomSheet({
             style,
           ]}
         >
-          {/* Header/Grabber */}
           <View style={[styles.grabber, { backgroundColor: theme.border }]} />
 
           <View style={styles.header}>

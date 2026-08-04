@@ -1,14 +1,8 @@
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/hooks/useTheme';
 import { Spacing, Radius, Typography } from '@/theme';
 import { Icon } from './Icon';
-
-interface SearchBarProps {
-  value: string;
-  onChangeText: (text: string) => void;
-  placeholder?: string;
-  onClear?: () => void;
-}
+import { SearchBarProps } from '@/types/types';
 
 export function SearchBar({
   value,

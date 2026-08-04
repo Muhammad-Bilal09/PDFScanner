@@ -1,12 +1,7 @@
 import { ActivityIndicator, StyleSheet, Text, View, ViewStyle } from 'react-native';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/hooks/useTheme';
 import { Spacing, Typography } from '@/theme';
-
-interface LoadingViewProps {
-  message?: string;
-  fullscreen?: boolean;
-  style?: ViewStyle;
-}
+import { LoadingViewProps } from '@/types/types';
 
 export function LoadingView({
   message = 'Loading...',

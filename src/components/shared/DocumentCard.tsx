@@ -1,48 +1,27 @@
-import { useTheme } from "@/hooks/use-theme";
+import { useTheme } from "@/hooks/useTheme";
 import { Radius, Shadows, Spacing, Typography } from "@/theme";
+import { DocumentCardsProps } from "@/types/types";
 import { Image } from "expo-image";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Icon } from "./Icon";
 
-import { Point } from "@/services/processor";
-
-export interface PageItemType {
-  id: string;
-  originalUri: string;
-  processedUri: string;
-  corners: Point[];
-  filter: string;
-  rotation: number; // 0, 90, 180, 270
-  cloudinaryOriginalUrl?: string;
-  cloudinaryProcessedUrl?: string;
-}
-
-export interface DocumentItemType {
-  id: string;
-  name: string;
-  date: string;
-  createdAt?: number;
-  size: string;
-  pages: number;
-  thumbColor?: string;
-  cloudinaryUrl?: string;
-  pagesList: PageItemType[];
-  tags?: string[];
-  favorite?: boolean;
-}
-
-interface DocumentCardProps {
-  item: DocumentItemType;
-  onPress: () => void;
-  onMenuPress: () => void;
-}
 
 export function DocumentCard({
   item,
+  viewMode = 'list',
   onPress,
   onMenuPress,
-}: DocumentCardProps) {
+}: DocumentCardsProps) {
   const theme = useTheme();
+
+  const docTitle = item.name || item.title || "Untitled Document";
+  const pagesCount = Array.isArray(item.pages) ? item.pages.length : (item.pages || (item.pagesList ? item.pagesList.length : 1));
+  const docSize = item.size || item.pdfSizeFormatted || "PDF";
+  const docDate = item.date || (item.createdAt ? new Date(item.createdAt).toLocaleDateString() : "");
+
+  const thumbUri = item.pagesList && item.pagesList.length > 0
+    ? (item.pagesList[0].thumbnailUri || item.pagesList[0].croppedUri || item.pagesList[0].originalUri)
+    : (Array.isArray(item.pages) && item.pages.length > 0 ? item.pages[0].croppedUri || item.pages[0].originalUri : null);
 
   return (
     <Pressable
@@ -57,16 +36,15 @@ export function DocumentCard({
         Shadows.sm,
       ]}
     >
-      {/* Page Thumbnail */}
       <View
         style={[
           styles.thumbnail,
           { backgroundColor: item.thumbColor || theme.primaryLight },
         ]}
       >
-        {item.pagesList && item.pagesList.length > 0 ? (
+        {thumbUri ? (
           <Image
-            source={{ uri: item.pagesList[0].processedUri }}
+            source={{ uri: thumbUri }}
             style={styles.thumbnailImg}
             contentFit="cover"
           />
@@ -91,18 +69,16 @@ export function DocumentCard({
         )}
       </View>
 
-      {/* Details */}
       <View style={styles.details}>
         <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>
-          {item.name}
+          {docTitle}
         </Text>
         <Text style={[styles.metadata, { color: theme.textSecondary }]}>
-          {item.date} · {item.size} · {item.pages}{" "}
-          {item.pages === 1 ? "Page" : "Pages"}
+          {docDate ? `${docDate} · ` : ""}{docSize} · {pagesCount}{" "}
+          {pagesCount === 1 ? "Page" : "Pages"}
         </Text>
       </View>
 
-      {/* Ellipsis/Options Button */}
       <Pressable
         onPress={onMenuPress}
         hitSlop={12}

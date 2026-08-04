@@ -7,7 +7,7 @@ import {
     writeAsStringAsync,
 } from "expo-file-system/legacy";
 import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
-import { optimizeImageForScanning } from "@/utils/photo-picker";
+import { optimizeImageForScanning } from "@/utils/photoPicker";
 
 const documentDirectory = Paths.document.uri.endsWith("/")
   ? Paths.document.uri
@@ -16,29 +16,13 @@ const cacheDirectory = Paths.cache.uri.endsWith("/")
   ? Paths.cache.uri
   : Paths.cache.uri + "/";
 
-export interface Point {
-  x: number; // Normalized coordinate between 0 and 1
-  y: number; // Normalized coordinate between 0 and 1
-}
+import { Point, EdgeDetectionResult, TaskCallback, FilterType } from '../types/types';
 
-export interface EdgeDetectionResult {
-  points: Point[];
-  width: number;
-  height: number;
-}
-
-// CDNs for online loading and initial downloading
 const OPENCV_CDN =
   "https://cdnjs.cloudflare.com/ajax/libs/opencv.js/4.5.4/opencv.js";
 
-// Local paths to save files for offline availability
 export const OPENCV_LOCAL_PATH = documentDirectory + "opencv_v4.5.4.js";
 
-// Active listeners and task registration map
-type TaskCallback = {
-  resolve: (data: any) => void;
-  reject: (err: any) => void;
-};
 const pendingTasks = new Map<string, TaskCallback>();
 let webViewRef: any = null;
 let isProcessorReady = false;
@@ -205,13 +189,17 @@ export const ImageProcessor = {
         imageBase64: dataUrl,
       });
       return {
+        detected: result.detected ?? (result.points && result.points.length === 4),
+        confidence: result.confidence ?? (result.points && result.points.length === 4 ? 0.95 : 0),
         points: result.points,
-        width: result.width || optimized.width,
-        height: result.height || optimized.height,
+        width: result.width || optimized.width || 1920,
+        height: result.height || optimized.height || 1920,
       };
     } catch (e) {
       console.warn("[Processor] detectEdges error fallback:", e);
       return {
+        detected: false,
+        confidence: 0,
         points: [
           { x: 0.15, y: 0.15 },
           { x: 0.85, y: 0.15 },
@@ -272,10 +260,12 @@ export const ImageProcessor = {
         const maxX = Math.min(1, Math.max(...xs));
         const maxY = Math.min(1, Math.max(...ys));
 
-        const originX = Math.round(minX * optimized.width);
-        const originY = Math.round(minY * optimized.height);
-        const cropW = Math.max(10, Math.round((maxX - minX) * optimized.width));
-        const cropH = Math.max(10, Math.round((maxY - minY) * optimized.height));
+        const optWidth = optimized.width || 1920;
+        const optHeight = optimized.height || 1920;
+        const originX = Math.round(minX * optWidth);
+        const originY = Math.round(minY * optHeight);
+        const cropW = Math.max(10, Math.round((maxX - minX) * optWidth));
+        const cropH = Math.max(10, Math.round((maxY - minY) * optHeight));
 
         const cropped = await manipulateAsync(
           optimized.uri,

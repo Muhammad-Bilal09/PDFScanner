@@ -1,41 +1,33 @@
+import { useTheme } from '@/hooks/useTheme';
+import { Spacing, Typography } from '@/theme';
+import { HeaderAction, HeaderProps } from '@/types/types';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useTheme } from '@/hooks/use-theme';
-import { Spacing, Typography } from '@/theme';
 import { Icon } from './Icon';
-
-interface HeaderAction {
-  icon: string;
-  fallback: string;
-  onPress: () => void;
-  color?: string;
-}
-
-interface HeaderProps {
-  title: string;
-  showBack?: boolean;
-  onBackPress?: () => void;
-  rightActions?: HeaderAction[];
-}
 
 export function Header({
   title,
   showBack = true,
   onBackPress,
-  rightActions = [],
-}: HeaderProps) {
+  onBack,
+  actions = [],
+}: HeaderProps & { onBackPress?: () => void; rightActions?: HeaderAction[] }) {
   const theme = useTheme();
   const router = useRouter();
 
   const handleBack = () => {
     if (onBackPress) {
       onBackPress();
+    } else if (onBack) {
+      onBack();
     } else if (router.canGoBack()) {
       router.back();
     } else {
       router.replace('/home' as any);
     }
   };
+
+  const actionList = actions.length > 0 ? actions : [];
 
   return (
     <View style={[styles.container, { borderBottomColor: theme.border }]}>
@@ -56,7 +48,7 @@ export function Header({
       </View>
 
       <View style={styles.rightContainer}>
-        {rightActions.map((action, index) => (
+        {actionList.map((action, index) => (
           <Pressable
             key={index}
             onPress={action.onPress}
@@ -65,7 +57,7 @@ export function Header({
           >
             <Icon
               sf={action.icon}
-              fallback={action.fallback}
+              fallback={action.icon}
               size={20}
               color={action.color || theme.primary}
             />
